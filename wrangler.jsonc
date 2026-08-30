@@ -37,7 +37,4 @@
   // Every 5 minutes by default — adjust to taste. A tenant's
   // reachability is also checked on-demand from its detail page
   // or via POST /api/tenants/health-check-all.
-  "triggers": {
-    "crons": ["*/5 * * * *"]
-  }
 }
