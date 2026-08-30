@@ -1,0 +1,43 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lummet-control-plane",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Bind this Worker's own, independent D1 database.
+  // This database holds ONLY control-plane metadata:
+  // the tenant registry, encrypted credential references,
+  // capability/health cache, and Lummet's own admin
+  // accounts/sessions. It never holds tenant content
+  // (casinos, reviews, news, pages, users, etc.).
+  "d1_databases": [
+    {
+      "binding": "LUMMET_DB",
+      "database_name": "lummet-control-plane-db",
+      "database_id": "REPLACE_WITH_ACTUAL_D1_DATABASE_ID"
+    }
+  ],
+
+  // Secrets (set via `wrangler secret put`, never here):
+  //   CREDENTIAL_KEK  — base64-encoded 32-byte AES-GCM key
+  //                     used to encrypt tenant HMAC secrets at rest.
+  //
+  // Routes / custom domain for the master hostname are configured
+  // separately in the Cloudflare dashboard or via `routes` here.
+  // Deliberately NOT using any hostname starting with "lummet."
+  // to avoid any collision with a tenant's lummet.<host> AI
+  // assistant subdomain — see DEPLOYMENT.md, "Choosing the master
+  // hostname".
+  "vars": {
+    "ENVIRONMENT": "production"
+  },
+
+  // Runs the health-check sweep (worker/cron.js) on a schedule.
+  // Every 5 minutes by default — adjust to taste. A tenant's
+  // reachability is also checked on-demand from its detail page
+  // or via POST /api/tenants/health-check-all.
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  }
+}
