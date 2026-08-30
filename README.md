@@ -213,6 +213,39 @@ remaining gaps:
 
 This closes out all 8 phases of the master plan.
 
+### Post-launch fix — orphaned tenants with no credential
+
+Found in production: `createTenant()` wrote the `tenants` row
+*before* generating the credential. If `CREDENTIAL_KEK` was missing
+or invalid at that moment, credential generation threw — leaving a
+tenant registered with **zero** rows in `tenant_api_credentials`.
+Its detail page would show `Configuration Error` /
+`no_active_credential` forever, with no way to fix it except
+guessing to click "Rotate credential" (which had the identical bug:
+it marked the old credential `rotated` *before* trying to issue the
+new one, so a KEK failure mid-rotation could leave a tenant with
+**zero active credentials**, not just its original one).
+
+Fixed in both `createTenant()` and `rotateCredential()`: credential
+material is now generated and validated *first* — if `CREDENTIAL_KEK`
+is missing, the function fails immediately with a clear message
+("check that CREDENTIAL_KEK is configured on this Worker") and
+**no row is written at all** — no orphaned tenant, no zeroed-out
+credential. The two writes (tenant + credential, or rotate-old +
+insert-new) are also now sent as a single `D1.batch()` call rather
+than two separate operations, so the database round-trip itself
+can't split them either.
+
+Verified with a functional test against a mocked D1: with no
+`CREDENTIAL_KEK` set, `createTenant()` now leaves 0 tenant rows and
+0 credential rows (previously: 1 orphaned tenant, 0 credentials);
+with a KEK set, both rows are written together as before.
+
+If you already have a tenant stuck in this state from before this
+fix, click **Rotate credential** on its detail page (once
+`CREDENTIAL_KEK` is confirmed set via `wrangler secret list`) — that
+now safely issues a fresh, active credential for it.
+
 ## Deployment
 
 See **DEPLOYMENT.md** in this same folder for the full, step-by-step

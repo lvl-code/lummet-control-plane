@@ -315,7 +315,7 @@ export async function renderTenantDetail(env, admin, tenantId, flash) {
         fetch('/api/tenants/' + id + '/rotate-credential', { method: 'POST' })
           .then(r => r.json())
           .then(data => {
-            if (!data.success) { alert('Failed: ' + (data.error || 'unknown error')); return; }
+            if (!data.success) { alert('Failed: ' + (data.message || data.error || 'unknown error')); return; }
             document.getElementById('rotate-result').innerHTML =
               '<div class="card"><h2>New credential — copy it now, shown only once</h2>' +
               '<pre class="mono" style="background:var(--bg);padding:14px;border-radius:8px;overflow-x:auto;">' +

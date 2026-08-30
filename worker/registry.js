@@ -58,25 +58,39 @@ export async function createTenant(env, data) {
     return { ok: false, status: 409, error: "host_already_registered" };
   }
 
+  // Generate + encrypt the credential FIRST, before writing anything.
+  // If CREDENTIAL_KEK is missing or invalid, this throws here and no
+  // tenant row is ever created — previously the tenant row was
+  // inserted first, so a KEK failure left an orphaned tenant with
+  // no credential at all (exactly the "no_active_credential" state
+  // this guards against now).
+  let material;
+  try {
+    material = await generateCredentialMaterial(env);
+  } catch (error) {
+    return {
+      ok: false,
+      status: 500,
+      error: "credential_generation_failed",
+      message: "Could not generate a credential — check that CREDENTIAL_KEK is configured on this Worker."
+    };
+  }
+
   const apiBaseUrl = normalizeApiBaseUrl(host, data.api_base_url);
 
-  await env.LUMMET_DB.prepare(
-    `INSERT INTO tenants (id, name, host, api_base_url, status, description, deployment_identifier)
-     VALUES (?, ?, ?, ?, 'active', ?, ?)`
-  )
-    .bind(
-      id,
-      data.name,
-      host,
-      apiBaseUrl,
-      data.description || null,
-      data.deployment_identifier || null
-    )
-    .run();
+  await env.LUMMET_DB.batch([
+    env.LUMMET_DB.prepare(
+      `INSERT INTO tenants (id, name, host, api_base_url, status, description, deployment_identifier)
+       VALUES (?, ?, ?, ?, 'active', ?, ?)`
+    ).bind(id, data.name, host, apiBaseUrl, data.description || null, data.deployment_identifier || null),
+    buildCredentialInsertStatement(env, id, material)
+  ]);
 
-  const credential = await issueCredential(env, id);
-
-  return { ok: true, tenant: await getTenant(env, id), credential };
+  return {
+    ok: true,
+    tenant: await getTenant(env, id),
+    credential: { credentialId: material.credentialId, secret: material.secret }
+  };
 }
 
 export async function updateTenant(env, id, data) {
@@ -135,44 +149,63 @@ export async function deleteTenant(env, id) {
 // Credentials
 // -----------------------------------------------------
 
-async function issueCredential(env, tenantId) {
+/**
+ * Generates and encrypts new credential material without touching
+ * D1. Deliberately separated from the insert so callers can
+ * validate/encrypt FIRST — if CREDENTIAL_KEK is missing or invalid,
+ * this throws before any row is written, instead of after (which
+ * previously could leave a tenant or a rotation with zero active
+ * credentials — see createTenant/rotateCredential below).
+ */
+async function generateCredentialMaterial(env) {
   const credentialId = crypto.randomUUID();
   const secret = generateSecret();
   const { encryptedSecret, secretIv } = await encryptSecret(env, secret);
+  return { credentialId, secret, encryptedSecret, secretIv };
+}
 
-  await env.LUMMET_DB.prepare(
+function buildCredentialInsertStatement(env, tenantId, material) {
+  return env.LUMMET_DB.prepare(
     `INSERT INTO tenant_api_credentials
       (tenant_id, credential_id, encrypted_secret, secret_iv, status)
      VALUES (?, ?, ?, ?, 'active')`
-  )
-    .bind(tenantId, credentialId, encryptedSecret, secretIv)
-    .run();
-
-  // Plaintext secret returned exactly once, to be configured on
-  // the tenant Worker as SUPER_API_SECRET / SUPER_API_CREDENTIAL_ID.
-  return { credentialId, secret };
+  ).bind(tenantId, material.credentialId, material.encryptedSecret, material.secretIv);
 }
 
 /**
  * Rotates a tenant's credential: marks the old one 'rotated' and
- * issues a fresh credential_id + secret. The administrator must
- * then update the tenant Worker's secrets to match, or the tenant
- * will start rejecting Lummet's requests as unauthorized.
+ * issues a fresh credential_id + secret, as a single atomic D1
+ * batch — either both writes land or neither does, so a tenant can
+ * never end up with zero active credentials mid-rotation. The
+ * administrator must then update the tenant Worker's secrets to
+ * match, or the tenant will start rejecting Lummet's requests as
+ * unauthorized.
  */
 export async function rotateCredential(env, tenantId) {
   const tenant = await getTenant(env, tenantId);
   if (!tenant) return { ok: false, status: 404, error: "not_found" };
 
-  await env.LUMMET_DB.prepare(
-    `UPDATE tenant_api_credentials SET status = 'rotated', rotated_at = CURRENT_TIMESTAMP
-     WHERE tenant_id = ? AND status = 'active'`
-  )
-    .bind(tenantId)
-    .run();
+  let material;
+  try {
+    material = await generateCredentialMaterial(env);
+  } catch (error) {
+    return {
+      ok: false,
+      status: 500,
+      error: "credential_generation_failed",
+      message: "Could not generate a new credential — check that CREDENTIAL_KEK is configured on this Worker."
+    };
+  }
 
-  const credential = await issueCredential(env, tenantId);
+  await env.LUMMET_DB.batch([
+    env.LUMMET_DB.prepare(
+      `UPDATE tenant_api_credentials SET status = 'rotated', rotated_at = CURRENT_TIMESTAMP
+       WHERE tenant_id = ? AND status = 'active'`
+    ).bind(tenantId),
+    buildCredentialInsertStatement(env, tenantId, material)
+  ]);
 
-  return { ok: true, credential };
+  return { ok: true, credential: { credentialId: material.credentialId, secret: material.secret } };
 }
 
 export async function revokeCredential(env, tenantId, credentialId) {

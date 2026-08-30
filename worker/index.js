@@ -293,12 +293,14 @@ export default {
             action: "create",
             success: result.ok,
             statusCode: result.ok ? 201 : result.status,
-            errorMessage: result.ok ? null : result.error,
+            errorMessage: result.ok ? null : (result.message || result.error),
             requestId,
             ipHash
           });
 
-          if (!result.ok) return json({ success: false, error: result.error }, result.status);
+          if (!result.ok) {
+            return json({ success: false, error: result.error, message: result.message }, result.status);
+          }
           return json({ success: true, data: result.tenant, credential: result.credential }, 201);
         }
 
@@ -377,9 +379,9 @@ export default {
             adminId: admin.id, tenantId: rotateParams.id, endpoint: path, method,
             resource: "tenant_credential", resourceId: rotateParams.id, action: "rotate",
             success: result.ok, statusCode: result.ok ? 200 : result.status,
-            errorMessage: result.ok ? null : result.error, requestId, ipHash
+            errorMessage: result.ok ? null : (result.message || result.error), requestId, ipHash
           });
-          if (!result.ok) return json({ success: false, error: result.error }, result.status);
+          if (!result.ok) return json({ success: false, error: result.error, message: result.message }, result.status);
           return json({ success: true, credential: result.credential });
         }
 
@@ -473,13 +475,13 @@ export default {
             action: "create",
             success: result.ok,
             statusCode: result.ok ? 201 : result.status,
-            errorMessage: result.ok ? null : result.error,
+            errorMessage: result.ok ? null : (result.message || result.error),
             requestId,
             ipHash
           });
 
           if (!result.ok) {
-            return html(await renderAddTenantForm(env, admin, { error: describeRegistryError(result.error) }));
+            return html(await renderAddTenantForm(env, admin, { error: result.message || describeRegistryError(result.error) }));
           }
 
           return html(await renderTenantCreatedPage(env, admin, result.tenant, result.credential), 201);
@@ -690,7 +692,8 @@ function describeAuthError(code) {
 function describeRegistryError(code) {
   const map = {
     name_and_host_required: "Name and host are required.",
-    host_already_registered: "A tenant with this host is already registered."
+    host_already_registered: "A tenant with this host is already registered.",
+    credential_generation_failed: "Could not generate a credential — check that CREDENTIAL_KEK is configured on this Worker."
   };
   return map[code] || "Could not register this tenant.";
 }
