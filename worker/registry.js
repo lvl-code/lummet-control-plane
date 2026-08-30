@@ -259,7 +259,11 @@ export async function testConnection(env, tenantId) {
 }
 
 function statusToHealthLabel(status, reason) {
-  if (reason === "no_active_credential" || reason === "credential_decrypt_failed") {
+  if (
+    reason === "no_active_credential" ||
+    reason === "credential_decrypt_failed" ||
+    reason === "tenant_not_configured"
+  ) {
     return "Configuration Error";
   }
   if (status === 401 || status === 403) return "Unauthorized";

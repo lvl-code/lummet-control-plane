@@ -158,8 +158,17 @@ export async function requestTenant(env, tenantOrId, options) {
 
   // Map the tenant's HTTP status straight through — the tenant's
   // Super API already returns the right status per its own
-  // validation/auth/rate-limit logic (Phase 1).
-  const reason = data?.error || reasonForStatus(response.status);
+  // validation/auth/rate-limit logic (Phase 1). Exception: 503 is
+  // the one status the tenant's Super API only ever returns for a
+  // single specific reason (SUPER_API_CREDENTIAL_ID/SECRET not set
+  // on that Worker — see en/worker/super/auth.js), even though its
+  // response body deliberately shows the same generic "unauthorized"
+  // it shows for every rejection (so a real attacker can't
+  // fingerprint which check failed). We already know what 503 means
+  // here, so surface that to the control-plane operator instead of
+  // the masked generic string.
+  const reason =
+    response.status === 503 ? "tenant_not_configured" : data?.error || reasonForStatus(response.status);
   return fail(response.status, reason, messageForStatus(response.status), { data });
 }
 
@@ -189,6 +198,7 @@ export function messageForStatus(status) {
     case 422: return "The tenant rejected this input as invalid.";
     case 429: return "The tenant is rate-limiting this credential.";
     case 500: return "The tenant encountered an internal error.";
+    case 503: return "The tenant has not been configured for Super API access — SUPER_API_CREDENTIAL_ID/SUPER_API_SECRET are not set on that Worker.";
     default: return "The tenant returned an unexpected error.";
   }
 }
