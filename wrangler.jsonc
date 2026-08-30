@@ -15,7 +15,7 @@
     {
       "binding": "LUMMET_DB",
       "database_name": "lummet-control-plane-db",
-      "database_id": "REPLACE_WITH_ACTUAL_D1_DATABASE_ID"
+      "database_id": "cb72dfd7-71d5-42a0-95c3-ef3efd591506"
     }
   ],
 
