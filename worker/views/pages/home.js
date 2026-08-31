@@ -557,8 +557,8 @@ export function renderPublicHomepage({ contactEmail } = {}) {
           <a href="#ai">Lummet AI</a>
           <a href="#demo">Get a Demo</a>
           <a href="#contact">Contact</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/terms">Terms</a>
+<!--          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a> -->
         </nav>
       </div>
       <div class="footer-bottom">
