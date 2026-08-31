@@ -37,7 +37,8 @@
   // assistant subdomain — see DEPLOYMENT.md, "Choosing the master
   // hostname".
   "vars": {
-    "ENVIRONMENT": "production"
+    "ENVIRONMENT": "production",
+    "CONTACT_EMAIL": "elijul@proton.me"
   },
 
   // Runs the health-check sweep (worker/cron.js) on a schedule.
