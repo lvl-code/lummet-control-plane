@@ -23,6 +23,13 @@
   //   CREDENTIAL_KEK  — base64-encoded 32-byte AES-GCM key
   //                     used to encrypt tenant HMAC secrets at rest.
   //
+  // Optional vars:
+  //   CONTACT_EMAIL   — if set, shown on the public homepage's
+  //                     "Get in Touch" section as a mailto link.
+  //                     Left unset by default; the public site
+  //                     shows a neutral fallback instead of an
+  //                     invented address until this is configured.
+  //
   // Routes / custom domain for the master hostname are configured
   // separately in the Cloudflare dashboard or via `routes` here.
   // Deliberately NOT using any hostname starting with "lummet."

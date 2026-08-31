@@ -18,9 +18,15 @@
 //   POST /api/tenants/:id/switch   (sets active tenant on session)
 //   DELETE /api/session/active-tenant  (clears active tenant on session)
 //
+// Public marketing site (unauthenticated):
+//   GET  /            (public homepage for anonymous visitors;
+//                       signed-in admins see the dashboard instead)
+//   GET  /privacy
+//   GET  /terms
+//
 // Dashboard pages (Phase 4, new):
 //   GET/POST /login
-//   GET  /
+//   GET  /             (authenticated dashboard, same path as above)
 //   GET  /tenants
 //   GET/POST /tenants/new
 //   GET  /tenants/health
@@ -46,6 +52,7 @@ import { logAudit } from "./audit.js";
 
 import { renderLoginPage } from "./views/pages/login.js";
 import { renderDashboardHome } from "./views/pages/dashboard.js";
+import { renderPublicHomepage, renderPublicStaticPage } from "./views/pages/home.js";
 import {
   renderTenantsList,
   renderAddTenantForm,
@@ -253,6 +260,53 @@ export default {
           }
           return redirect("/", { "Set-Cookie": loginResult.cookie });
         }
+      }
+
+      // ---------------------------------------------
+      // Public marketing site (unauthenticated, HTML)
+      //
+      // "/" is shared by two very different audiences: an
+      // anonymous visitor should see the public Lummet
+      // marketing homepage, while a signed-in admin should
+      // keep seeing the authenticated dashboard exactly as
+      // before. Rather than move the dashboard off "/" (which
+      // would change an existing route), an unauthenticated
+      // visitor is served the public page here and everything
+      // else falls through unchanged to the dashboard route
+      // further down, which still requires a session.
+      //
+      // /privacy and /terms are simple public placeholder pages
+      // linked from the homepage footer.
+      // ---------------------------------------------
+
+      if (method === "GET" && path === "/") {
+        const maybeAdmin = await auth.getCurrentAdmin(request, env);
+        if (!maybeAdmin) {
+          return html(renderPublicHomepage({ contactEmail: env.CONTACT_EMAIL || null }));
+        }
+        // Signed in — fall through to the authenticated dashboard route below.
+      }
+
+      if (method === "GET" && path === "/privacy") {
+        return html(
+          renderPublicStaticPage({
+            title: "Privacy",
+            heading: "Privacy",
+            bodyText:
+              "This page will describe how Lummet handles data for the platform and its connected brands. Full privacy documentation is coming soon."
+          })
+        );
+      }
+
+      if (method === "GET" && path === "/terms") {
+        return html(
+          renderPublicStaticPage({
+            title: "Terms",
+            heading: "Terms",
+            bodyText:
+              "This page will describe the terms of use for the Lummet platform. Full terms documentation is coming soon."
+          })
+        );
       }
 
       // ---------------------------------------------
