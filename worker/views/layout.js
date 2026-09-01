@@ -38,6 +38,9 @@ const NAV = [
       { label: "Users", href: "/system/users", key: "system-users" },
       { label: "Permissions", href: "/system/permissions", key: "system-permissions" },
       { label: "Components", href: "/system/components", key: "system-components" },
+      { label: "Blocks", href: "/system/blocks", key: "system-blocks" },
+      { label: "Navigation", href: "/system/nav-items", key: "system-nav-items" },
+      { label: "Banners", href: "/system/banners", key: "system-banners" },
       { label: "Media", href: "/system/media", key: "system-media" },
       { label: "Settings", href: "/system/settings", key: "system-settings" }
     ]
@@ -196,6 +199,25 @@ const STYLES = `
   .flash-success { background: rgba(62, 207, 142, 0.1); border: 1px solid rgba(62, 207, 142, 0.3); color: var(--ok); }
   .mono { font-family: "SF Mono", Consolas, monospace; font-size: 13px; }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .rte-toolbar { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+  .rte-toolbar button {
+    background: var(--bg); border: 1px solid var(--panel-border); color: var(--text);
+    border-radius: 5px; padding: 5px 9px; font-size: 12px; cursor: pointer;
+  }
+  .rte-toolbar button:hover { background: var(--accent-soft); }
+  .rte-editor {
+    min-height: 180px; max-height: 480px; overflow-y: auto;
+    background: var(--bg); border: 1px solid var(--panel-border); border-radius: 7px;
+    padding: 12px 14px; margin-bottom: 14px; font-size: 14px; line-height: 1.6;
+  }
+  .rte-editor:focus { outline: none; border-color: var(--accent); }
+  .rte-editor h2, .rte-editor h3 { margin: 0.6em 0 0.3em; }
+  .rte-editor blockquote { border-left: 3px solid var(--accent); margin: 0.6em 0; padding-left: 12px; color: var(--text-dim); }
+  .rte-editor ul, .rte-editor ol { padding-left: 22px; }
+
+  .media-field .media-preview { margin-bottom: 8px; }
+  .media-picker-panel { background: var(--bg); }
 `;
 
 function escapeHtml(value) {

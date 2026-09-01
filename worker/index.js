@@ -49,6 +49,7 @@
 import * as auth from "./auth.js";
 import * as registry from "./registry.js";
 import { logAudit } from "./audit.js";
+import { getFromTenant } from "./client.js";
 
 import { renderLoginPage } from "./views/pages/login.js";
 import { renderDashboardHome } from "./views/pages/dashboard.js";
@@ -77,6 +78,7 @@ import {
   submitDelete
 } from "./views/pages/crud.js";
 import { renderSettingsPage, submitSettings } from "./views/pages/settings.js";
+import { renderMediaUploadForm, submitMediaUpload } from "./views/pages/media.js";
 import { runHealthChecks, pruneOldAuditLogs } from "./cron.js";
 
 function json(data, status = 200, extraHeaders = {}) {
@@ -498,6 +500,38 @@ export default {
           return json({ success: true, data: summary });
         }
 
+        // Lists the active tenant's media library for the media-picker
+        // widget in CRUD forms. Proxies through the same authenticated
+        // client.js path as everything else — the browser never sees
+        // the tenant's credential, only this JSON list.
+        if (method === "GET" && path === "/api/media-picker") {
+          if (!admin.activeTenantId) {
+            return json({ success: true, data: [] });
+          }
+          const tenant = await registry.getTenant(env, admin.activeTenantId);
+          if (!tenant) return json({ success: true, data: [] });
+
+          const result = await getFromTenant(env, tenant, "/en/api/super/media");
+          if (!result.ok) return json({ success: false, error: result.reason }, result.status);
+          return json({ success: true, data: result.data.data || [] });
+        }
+
+        if (method === "POST" && path === "/api/media/upload") {
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitMediaUpload(env, admin, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "media", action: "upload",
+            success: result.ok, statusCode: result.ok ? 201 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data }, 201);
+        }
+
         return json({ success: false, error: "not_found" }, 404);
       }
 
@@ -631,6 +665,10 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
         : `flash=${encodeURIComponent(result.message || "Could not save settings")}&flash_type=error`;
 
       return redirect(`/system/settings?${flashParam}`);
+    }
+
+    if (method === "GET" && path === "/system/media/new") {
+      return html(await renderMediaUploadForm(env, admin));
     }
   }
 

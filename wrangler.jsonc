@@ -39,10 +39,17 @@
   "vars": {
     "ENVIRONMENT": "production",
     "CONTACT_EMAIL": "elijul@proton.me"
-  },
+  }
 
-  // Runs the health-check sweep (worker/cron.js) on a schedule.
-  // Every 5 minutes by default — adjust to taste. A tenant's
-  // reachability is also checked on-demand from its detail page
-  // or via POST /api/tenants/health-check-all.
+  // NOTE: the scheduled health-check sweep (worker/cron.js,
+  // runHealthChecks/pruneOldAuditLogs) is currently NOT wired to a
+  // Cron Trigger — Workers Free plan doesn't support them, so the
+  // "triggers.crons" block that used to run this every 5 minutes
+  // was removed. Health checks still run fine on-demand: click
+  // "Test connection" on a tenant's page, or "Run all now" on the
+  // Health page (POST /api/tenants/health-check-all). If/when this
+  // moves to a paid plan, re-add:
+  //   "triggers": { "crons": ["*/5 * * * *"] }
+  // and both scheduled() and pruneOldAuditLogs will resume running
+  // automatically — no other code changes needed.
 }
