@@ -279,7 +279,7 @@ export function renderPublicStaticPage({ title, heading, bodyText }) {
 <body>
   <header class="site">
     <div class="nav-inner">
-      <a class="logo" href="/"><span class="dot"></span> Lummet</a>
+      <a class="logo" href="https://level.casino/media/lummet/1788359639229-55a3643f6bba8b7a.png"><span class="dot"></span> Lummet</a>
       <a class="btn btn-secondary" href="/">Back to Lummet</a>
     </div>
   </header>
@@ -345,7 +345,7 @@ export function renderPublicHomepage({ contactEmail } = {}) {
 
   <header class="site">
     <div class="nav-inner">
-      <a class="logo" href="/"><span class="dot"></span> Lummet</a>
+      <a class="logo" href="https://level.casino/media/lummet/1788359639229-55a3643f6bba8b7a.png"><span class="dot"></span> Lummet</a>
       <nav class="links">
         <a href="#platform">Platform</a>
         <a href="#brands">Brands</a>
@@ -548,7 +548,7 @@ export function renderPublicHomepage({ contactEmail } = {}) {
     <div class="wrap">
       <div class="footer-grid">
         <div>
-          <a class="logo" href="/"><span class="dot"></span> Lummet</a>
+          <a class="logo" href="https://level.casino/media/lummet/1788359639229-55a3643f6bba8b7a.png"><span class="dot"></span> Lummet</a>
           <p style="max-width:280px;margin-top:10px;">Centralized technology and AI infrastructure for scalable digital brands.</p>
         </div>
         <nav class="footer-nav">
