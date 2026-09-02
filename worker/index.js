@@ -79,6 +79,13 @@ import {
 } from "./views/pages/crud.js";
 import { renderSettingsPage, submitSettings } from "./views/pages/settings.js";
 import { renderMediaUploadForm, submitMediaUpload } from "./views/pages/media.js";
+import {
+  renderPermissionsMatrix,
+  submitSetPermission,
+  renderUserItemAccess,
+  submitSetItemScope,
+  submitSetItemAssignment
+} from "./views/pages/permissions.js";
 import { runHealthChecks, pruneOldAuditLogs } from "./cron.js";
 
 function json(data, status = 200, extraHeaders = {}) {
@@ -532,6 +539,56 @@ export default {
           return json({ success: true, data: result.data?.data }, 201);
         }
 
+        if (method === "POST" && path === "/api/permissions/set") {
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitSetPermission(env, admin, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "permissions", action: "set",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        const itemAccessScopeParams = matchPath("/api/item-access/:id/scope", path);
+        if (method === "POST" && itemAccessScopeParams) {
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitSetItemScope(env, admin, itemAccessScopeParams.id, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "item_access", resourceId: itemAccessScopeParams.id, action: "set_scope",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        const itemAccessAssignParams = matchPath("/api/item-access/:id/assignment", path);
+        if (method === "POST" && itemAccessAssignParams) {
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitSetItemAssignment(env, admin, itemAccessAssignParams.id, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "item_access", resourceId: itemAccessAssignParams.id, action: "set_assignment",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
         return json({ success: false, error: "not_found" }, 404);
       }
 
@@ -669,6 +726,15 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
 
     if (method === "GET" && path === "/system/media/new") {
       return html(await renderMediaUploadForm(env, admin));
+    }
+
+    if (method === "GET" && path === "/system/permissions") {
+      return html(await renderPermissionsMatrix(env, admin));
+    }
+
+    const itemAccessParams = matchPath("/system/users/:id/item-access", path);
+    if (method === "GET" && itemAccessParams) {
+      return html(await renderUserItemAccess(env, admin, itemAccessParams.id));
     }
   }
 

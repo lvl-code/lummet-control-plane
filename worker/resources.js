@@ -78,6 +78,30 @@ export const RESOURCES = {
       { name: "sort_order", label: "Sort order", type: "number" },
       { name: "logo_media_id", label: "Logo image", type: "media" },
       { name: "hero_image_media_id", label: "Hero image", type: "media" },
+      // Not real columns on `casinos` — the tenant's Super API
+      // (handleGetCasino/handleCreateCasino/handleUpdateCasino)
+      // reads/writes these through casino_categories and geo_rules
+      // respectively, and attaches them to the record as
+      // category_ids / geo_rules so this generic form can round-trip
+      // them like any other field.
+      {
+        name: "category_ids",
+        label: "Categories",
+        type: "multi_select",
+        optionsResource: "categories",
+        optionValueKey: "id",
+        optionLabelKey: "name",
+        castTo: "number"
+      },
+      {
+        name: "geo_rules",
+        label: "Countries",
+        type: "geo_rules",
+        optionsResource: "countries",
+        optionValueKey: "code",
+        optionLabelKey: "name",
+        hint: "which countries can see/access this casino"
+      },
       { name: "seo_title", label: "SEO title", type: "text" },
       { name: "seo_description", label: "SEO description", type: "textarea" }
     ]

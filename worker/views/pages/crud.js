@@ -73,6 +73,55 @@ function errorNotice(env, admin, config, tenant, activeKey, result) {
 // LIST
 // -----------------------------------------------------
 
+// -----------------------------------------------------
+// Media grid — a visual thumbnail grid for the media library list,
+// instead of the generic filename/URL text table every other
+// resource gets. Each card shows the actual image, its dimensions,
+// and folder, with edit/delete actions.
+// -----------------------------------------------------
+
+function formatBytes(bytes) {
+  if (!bytes && bytes !== 0) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderMediaGrid(rows, base, config) {
+  const cards = rows
+    .map((row) => {
+      const id = row.id;
+      const thumb = row.thumbnail_url || row.url;
+      const dims = row.width && row.height ? `${row.width}×${row.height}` : "";
+      const meta = [dims, formatBytes(row.size)].filter(Boolean).join(" · ");
+      return `
+        <div class="media-card" style="border:1px solid var(--panel-border);border-radius:10px;overflow:hidden;background:var(--panel-bg,transparent);">
+          <a href="${base}/${encodeURIComponent(id)}/edit" style="display:block;aspect-ratio:1/1;background:repeating-conic-gradient(#00000010 0% 25%, transparent 0% 50%) 50% / 16px 16px;">
+            ${
+              thumb
+                ? `<img src="${escapeHtml(thumb)}" alt="${escapeHtml(row.alt_text || row.filename || "")}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;" />`
+                : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:12px;">No preview</div>`
+            }
+          </a>
+          <div style="padding:8px 10px;">
+            <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(row.filename || "")}">${escapeHtml(row.filename || "—")}</div>
+            <div style="font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(row.folder || "")}${row.folder && meta ? " · " : ""}${escapeHtml(meta)}</div>
+            <div style="margin-top:6px;font-size:12px;display:flex;justify-content:space-between;">
+              <a href="${base}/${encodeURIComponent(id)}/edit">Edit</a>
+              ${
+                config.supportsDelete
+                  ? `<a href="#" onclick="if(confirm('Delete this media item?')) lummetDelete('${base}/${encodeURIComponent(id)}/delete'); return false;" style="color:var(--danger);">Delete</a>`
+                  : ""
+              }
+            </div>
+          </div>
+        </div>`;
+    })
+    .join("");
+
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));gap:14px;">${cards}</div>`;
+}
+
 export async function renderResourceList(env, admin, resourceKey, config, flash) {
   const activeKey = nav(resourceKey, config);
   const { tenant } = await resolveActiveTenant(env, admin);
@@ -108,7 +157,9 @@ export async function renderResourceList(env, admin, resourceKey, config, flash)
       ${
         rows.length === 0
           ? `<div class="empty">Nothing here yet.</div>`
-          : `<table>
+          : resourceKey === "media"
+            ? renderMediaGrid(rows, base, config)
+            : `<table>
               <thead><tr>${config.listColumns.map((c) => `<th>${escapeHtml(c.label)}</th>`).join("")}<th></th></tr></thead>
               <tbody>
                 ${rows
@@ -118,6 +169,7 @@ export async function renderResourceList(env, admin, resourceKey, config, flash)
                       ${config.listColumns.map((c) => `<td>${formatCell(row[c.key], c.type)}</td>`).join("")}
                       <td>
                         <a href="${base}/${encodeURIComponent(id)}/edit">${config.roleOnly ? "Edit role" : "Edit"}</a>
+                        ${resourceKey === "users" ? ` &nbsp;·&nbsp; <a href="/system/users/${encodeURIComponent(id)}/item-access">Item access</a>` : ""}
                         ${
                           config.supportsDelete
                             ? ` &nbsp;·&nbsp; <a href="#" onclick="if(confirm('Delete this ${escapeHtml(config.label.toLowerCase().replace(/s$/, ""))}?')) lummetDelete('${base}/${encodeURIComponent(id)}/delete'); return false;">Delete</a>`
@@ -152,7 +204,26 @@ export async function renderResourceList(env, admin, resourceKey, config, flash)
 // CREATE / EDIT FORM
 // -----------------------------------------------------
 
-function renderField(field, record) {
+// Some tenant GET endpoints return array-shaped columns (reviews.pros/
+// cons, casinos.features) as the raw JSON-encoded TEXT string straight
+// out of D1 (`SELECT *` doesn't parse it), rather than as a real JS
+// array. When that happens `Array.isArray` is false and the field
+// would render blank even though the record has data — silently
+// wiping it out on next save. Handle both shapes defensively.
+function toListDisplayValue(rawStoredValue) {
+  if (Array.isArray(rawStoredValue)) return rawStoredValue.join("\n");
+  if (typeof rawStoredValue === "string" && rawStoredValue) {
+    try {
+      const parsed = JSON.parse(rawStoredValue);
+      if (Array.isArray(parsed)) return parsed.join("\n");
+    } catch {
+      // not JSON — fall through to blank
+    }
+  }
+  return "";
+}
+
+function renderField(field, record, fieldOptions) {
   const rawStoredValue = record ? record[field.name] : null;
   const value = record ? record[field.name] : "";
   const disabled = field.lockOnEdit && record ? "disabled" : "";
@@ -164,10 +235,18 @@ function renderField(field, record) {
     // Stored as a real array (e.g. reviews.pros, casinos.features).
     // Displayed one item per line, matching the tenant's own admin
     // UI exactly (en/static/js/admin.js splits/joins on "\n").
-    const displayValue = Array.isArray(rawStoredValue) ? rawStoredValue.join("\n") : "";
+    const displayValue = toListDisplayValue(rawStoredValue);
     return `
       <label for="${field.name}">${escapeHtml(field.label)}${field.hint ? ` <span style="color:var(--text-dim);font-weight:400;">— ${escapeHtml(field.hint)}</span>` : ""}</label>
       <textarea id="${field.name}" name="${field.name}" rows="4" placeholder="One per line">${escapeHtml(displayValue)}</textarea>`;
+  }
+
+  if (field.type === "multi_select") {
+    return renderMultiSelectField(field, rawStoredValue, (fieldOptions && fieldOptions[field.optionsResource]) || []);
+  }
+
+  if (field.type === "geo_rules") {
+    return renderGeoRulesField(field, rawStoredValue, (fieldOptions && fieldOptions[field.optionsResource]) || []);
   }
 
   if (field.type === "json_object") {
@@ -400,6 +479,169 @@ function renderMediaPickerField(field, currentId) {
     </script>`;
 }
 
+// -----------------------------------------------------
+// Multi-select — checkbox group for a field whose value is an array
+// of ids referencing another resource (e.g. casinos.category_ids ->
+// categories). Checkboxes can't share a `name` and survive this
+// control plane's parseForm (which keeps only the last value per
+// key — see index.js), so selections are tracked in a hidden JSON
+// input instead, same pattern as the media picker.
+// -----------------------------------------------------
+
+let multiSelectInstanceCounter = 0;
+
+function renderMultiSelectField(field, rawStoredValue, options) {
+  const instanceId = `ms_${field.name}_${multiSelectInstanceCounter++}`;
+  const selected = new Set(
+    (Array.isArray(rawStoredValue) ? rawStoredValue : []).map((v) => String(v))
+  );
+
+  const optionsHtml = options
+    .map((opt) => {
+      const optValue = String(opt[field.optionValueKey]);
+      const optLabel = String(opt[field.optionLabelKey]);
+      const checked = selected.has(optValue) ? "checked" : "";
+      return `
+        <label style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--panel-border);padding:4px 10px;border-radius:16px;font-weight:400;font-size:13px;margin:0 6px 6px 0;">
+          <input type="checkbox" data-ms-option value="${escapeHtml(optValue)}" style="width:auto;margin:0;" ${checked} />
+          ${escapeHtml(optLabel)}
+        </label>`;
+    })
+    .join("");
+
+  return `
+    <label>${escapeHtml(field.label)}${field.hint ? ` <span style="color:var(--text-dim);font-weight:400;">— ${escapeHtml(field.hint)}</span>` : ""}</label>
+    <div class="multi-select-field" id="${instanceId}" style="margin-bottom:14px;">
+      ${options.length ? `<div style="display:flex;flex-wrap:wrap;">${optionsHtml}</div>` : `<div style="color:var(--text-dim);font-size:13px;">None available.</div>`}
+      <input type="hidden" name="${field.name}" id="${instanceId}_input" value='${escapeHtml(JSON.stringify([...selected]))}' />
+    </div>
+    <script>
+      (function() {
+        const root = document.getElementById("${instanceId}");
+        const hidden = document.getElementById("${instanceId}_input");
+        function sync() {
+          const checked = Array.from(root.querySelectorAll("[data-ms-option]:checked")).map(function(c) { return c.value; });
+          hidden.value = JSON.stringify(checked);
+        }
+        root.querySelectorAll("[data-ms-option]").forEach(function(c) { c.addEventListener("change", sync); });
+        root.closest("form")?.addEventListener("submit", sync);
+      })();
+    </script>`;
+}
+
+// -----------------------------------------------------
+// Geo rules — per-country allow/block editor for a field whose value
+// is an array of { country_code, status, bonus_override } (e.g.
+// casinos.geo_rules). Rows are built/removed directly in the DOM;
+// a hidden JSON input mirrors current row state on every change and
+// right before submit, same sync-on-submit pattern as the rich text
+// editor.
+// -----------------------------------------------------
+
+let geoRulesInstanceCounter = 0;
+
+function geoRuleRowHtml(instanceId, code, label, status, bonusOverride) {
+  const safeCode = escapeHtml(code);
+  return `
+    <tr data-geo-row data-country="${safeCode}">
+      <td style="padding:6px 8px;">${escapeHtml(label)} <span class="mono" style="color:var(--text-dim);">(${safeCode})</span></td>
+      <td style="padding:6px 8px;">
+        <select data-geo-status style="width:auto;">
+          <option value="allowed" ${status === "allowed" ? "selected" : ""}>Allowed</option>
+          <option value="blocked" ${status === "blocked" ? "selected" : ""}>Blocked</option>
+        </select>
+      </td>
+      <td style="padding:6px 8px;"><input type="text" data-geo-bonus value="${escapeHtml(bonusOverride || "")}" placeholder="optional" style="width:100%;margin:0;" /></td>
+      <td style="padding:6px 8px;"><button type="button" class="btn btn-secondary btn-small" data-geo-remove>✕</button></td>
+    </tr>`;
+}
+
+function renderGeoRulesField(field, rawStoredValue, countries) {
+  const instanceId = `geo_${field.name}_${geoRulesInstanceCounter++}`;
+  const rules = Array.isArray(rawStoredValue) ? rawStoredValue : [];
+  const labelByCode = {};
+  for (const c of countries) labelByCode[c[field.optionValueKey]] = c[field.optionLabelKey];
+
+  const rowsHtml = rules
+    .map((r) => geoRuleRowHtml(instanceId, r.country_code, labelByCode[r.country_code] || r.country_code, r.status, r.bonus_override))
+    .join("");
+
+  const countryOptionsHtml = countries
+    .map((c) => `<option value="${escapeHtml(c[field.optionValueKey])}" data-label="${escapeHtml(c[field.optionLabelKey])}">${escapeHtml(c[field.optionLabelKey])} (${escapeHtml(c[field.optionValueKey])})</option>`)
+    .join("");
+
+  return `
+    <label>${escapeHtml(field.label)}${field.hint ? ` <span style="color:var(--text-dim);font-weight:400;">— ${escapeHtml(field.hint)}</span>` : ""}</label>
+    <div class="geo-rules-field" id="${instanceId}" style="margin-bottom:14px;">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:10px;" id="${instanceId}_table">
+        <thead><tr style="text-align:left;font-size:12px;color:var(--text-dim);"><th style="padding:6px 8px;">Country</th><th style="padding:6px 8px;">Status</th><th style="padding:6px 8px;">Bonus override</th><th></th></tr></thead>
+        <tbody id="${instanceId}_rows">${rowsHtml}</tbody>
+      </table>
+      ${countries.length ? `
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="${instanceId}_add_country" style="flex:1;">
+          <option value="">Add a country…</option>
+          ${countryOptionsHtml}
+        </select>
+        <button type="button" class="btn btn-secondary btn-small" id="${instanceId}_add_btn">Add</button>
+      </div>` : `<div style="color:var(--text-dim);font-size:13px;">No countries configured yet.</div>`}
+      <input type="hidden" name="${field.name}" id="${instanceId}_input" />
+    </div>
+    <script>
+      (function() {
+        const tbody = document.getElementById("${instanceId}_rows");
+        const hidden = document.getElementById("${instanceId}_input");
+        const addSelect = document.getElementById("${instanceId}_add_country");
+        const addBtn = document.getElementById("${instanceId}_add_btn");
+
+        function sync() {
+          const rows = Array.from(tbody.querySelectorAll("[data-geo-row]"));
+          const rules = rows.map(function(tr) {
+            return {
+              country_code: tr.getAttribute("data-country"),
+              status: tr.querySelector("[data-geo-status]").value,
+              bonus_override: tr.querySelector("[data-geo-bonus]").value || null
+            };
+          });
+          hidden.value = JSON.stringify(rules);
+        }
+
+        tbody.addEventListener("change", sync);
+        tbody.addEventListener("input", sync);
+        tbody.addEventListener("click", function(e) {
+          if (e.target.closest("[data-geo-remove]")) {
+            e.target.closest("tr").remove();
+            sync();
+          }
+        });
+
+        if (addBtn) {
+          addBtn.addEventListener("click", function() {
+            const code = addSelect.value;
+            if (!code) return;
+            if (tbody.querySelector('[data-country="' + code + '"]')) { addSelect.value = ""; return; }
+            const opt = addSelect.options[addSelect.selectedIndex];
+            const label = opt.getAttribute("data-label") || code;
+            const tr = document.createElement("tr");
+            tr.setAttribute("data-geo-row", "1");
+            tr.setAttribute("data-country", code);
+            tr.innerHTML =
+              '<td style="padding:6px 8px;">' + label + ' <span class="mono" style="color:var(--text-dim);">(' + code + ')</span></td>' +
+              '<td style="padding:6px 8px;"><select data-geo-status style="width:auto;"><option value="allowed">Allowed</option><option value="blocked">Blocked</option></select></td>' +
+              '<td style="padding:6px 8px;"><input type="text" data-geo-bonus placeholder="optional" style="width:100%;margin:0;" /></td>' +
+              '<td style="padding:6px 8px;"><button type="button" class="btn btn-secondary btn-small" data-geo-remove>✕</button></td>';
+            tbody.appendChild(tr);
+            addSelect.value = "";
+            sync();
+          });
+        }
+
+        sync();
+        tbody.closest("form")?.addEventListener("submit", sync);
+      })();
+    </script>`;
+}
+
 export async function renderResourceForm(env, admin, resourceKey, config, id, formError) {
   const activeKey = nav(resourceKey, config);
   const { tenant } = await resolveActiveTenant(env, admin);
@@ -417,13 +659,32 @@ export async function renderResourceForm(env, admin, resourceKey, config, id, fo
   const isEdit = !!id;
   const flashHtml = formError ? `<div class="flash flash-error">${escapeHtml(formError)}</div>` : "";
 
+  // Some field types (multi_select, geo_rules) present choices drawn
+  // from another resource on this same tenant (e.g. casinos.category_ids
+  // picks from the categories list). Fetch each distinct optionsResource
+  // referenced by this config's fields once, up front.
+  const optionResourceKeys = [...new Set(config.fields.filter((f) => f.optionsResource).map((f) => f.optionsResource))];
+  const fieldOptions = {};
+  for (const key of optionResourceKeys) {
+    const optResult = await getFromTenant(env, tenant, `${BASE_PATH}/${key}`);
+    fieldOptions[key] = optResult.ok ? (optResult.data.data || []) : [];
+  }
+
   const body = `
     <h1>${isEdit ? `Edit ${escapeHtml(config.label.replace(/s$/, ""))}` : `New ${escapeHtml(config.label.replace(/s$/, ""))}`}</h1>
     <p class="subtitle">on <strong>${escapeHtml(tenant.name)}</strong></p>
     ${flashHtml}
     <div class="card" style="max-width:640px;">
+      ${
+        resourceKey === "media" && record
+          ? `<div style="margin-bottom:18px;">
+              <img src="${escapeHtml(record.url)}" alt="${escapeHtml(record.alt_text || record.filename || "")}" style="max-width:100%;max-height:320px;border-radius:8px;border:1px solid var(--panel-border);display:block;" />
+              <div style="font-size:12px;color:var(--text-dim);margin-top:6px;">${escapeHtml(record.filename || "")}${record.width && record.height ? ` · ${record.width}×${record.height}` : ""}</div>
+            </div>`
+          : ""
+      }
       <form method="POST" action="${isEdit ? `${base}/${encodeURIComponent(id)}/edit` : `${base}/new`}">
-        ${config.fields.map((f) => renderField(f, record)).join("")}
+        ${config.fields.map((f) => renderField(f, record, fieldOptions)).join("")}
         <button class="btn" type="submit">${isEdit ? "Save changes" : "Create"}</button>
         <a class="btn btn-secondary" href="${base}">Cancel</a>
       </form>
@@ -517,6 +778,31 @@ function coerceFieldValue(field, rawValue) {
 
     case "media":
       return rawValue === "" || rawValue == null ? null : Number(rawValue);
+
+    case "multi_select": {
+      const text = (rawValue ?? "").trim();
+      if (!text) return [];
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (error) {
+        throw new Error(`"${field.label}" selection was malformed — please try again.`);
+      }
+      if (!Array.isArray(parsed)) return [];
+      return field.castTo === "number" ? parsed.map(Number) : parsed;
+    }
+
+    case "geo_rules": {
+      const text = (rawValue ?? "").trim();
+      if (!text) return [];
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (error) {
+        throw new Error(`"${field.label}" rules were malformed — please try again.`);
+      }
+      return Array.isArray(parsed) ? parsed : [];
+    }
 
     case "richtext":
       return rawValue ?? "";
