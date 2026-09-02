@@ -117,11 +117,20 @@ export async function requestTenant(env, tenantOrId, options) {
 
   const bodyText = body != null ? JSON.stringify(body) : "";
 
+  // Sign against the path WITHOUT its query string. The tenant's
+  // route resolver derives its own signing path from `url.pathname`
+  // (query stripped) before calling verifySuperApiRequest — so if a
+  // caller here passes e.g. "/en/api/super/media?folder=x" and we
+  // signed that whole string, the tenant would recompute a different
+  // (shorter) signing input and every such request would 401. Query
+  // params are still sent — just not included in the signature.
+  const [signPath] = path.split("?");
+
   const headers = await buildSuperApiHeaders({
     credentialId: credential.credential_id,
     secret,
     method,
-    path,
+    path: signPath,
     bodyText
   });
 

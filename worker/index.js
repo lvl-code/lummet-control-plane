@@ -77,8 +77,14 @@ import {
   submitUpdate,
   submitDelete
 } from "./views/pages/crud.js";
-import { renderSettingsPage, submitSettings } from "./views/pages/settings.js";
-import { renderMediaUploadForm, submitMediaUpload } from "./views/pages/media.js";
+import {
+  renderSettingsPage,
+  submitSettings,
+  submitCreateAdRule,
+  submitUpdateAdRule,
+  submitDeleteAdRule
+} from "./views/pages/settings.js";
+import { renderMediaUploadForm, submitMediaUpload, submitMediaFromUrl } from "./views/pages/media.js";
 import {
   renderPermissionsMatrix,
   submitSetPermission,
@@ -86,6 +92,12 @@ import {
   submitSetItemScope,
   submitSetItemAssignment
 } from "./views/pages/permissions.js";
+import {
+  renderReviewBlocksPage,
+  submitCreateReviewBlock,
+  submitUpdateReviewBlock,
+  submitDeleteReviewBlock
+} from "./views/pages/review-blocks.js";
 import { runHealthChecks, pruneOldAuditLogs } from "./cron.js";
 
 function json(data, status = 200, extraHeaders = {}) {
@@ -539,6 +551,22 @@ export default {
           return json({ success: true, data: result.data?.data }, 201);
         }
 
+        if (method === "POST" && path === "/api/media/from-url") {
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitMediaFromUrl(env, admin, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "media", action: "create_from_url",
+            success: result.ok, statusCode: result.ok ? 201 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data }, 201);
+        }
+
         if (method === "POST" && path === "/api/permissions/set") {
           const payload = await request.json().catch(() => ({}));
           const result = await submitSetPermission(env, admin, payload);
@@ -580,6 +608,78 @@ export default {
           await logAudit(env, {
             adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
             resource: "item_access", resourceId: itemAccessAssignParams.id, action: "set_assignment",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        if (method === "POST" && path === "/api/ad-rules") {
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitCreateAdRule(env, admin, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "ad_rules", action: "create",
+            success: result.ok, statusCode: result.ok ? 201 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data }, 201);
+        }
+
+        const adRuleParams = matchPath("/api/ad-rules/:id", path);
+        if (adRuleParams && (method === "PUT" || method === "DELETE")) {
+          const payload = method === "PUT" ? await request.json().catch(() => ({})) : null;
+          const result =
+            method === "PUT"
+              ? await submitUpdateAdRule(env, admin, adRuleParams.id, payload)
+              : await submitDeleteAdRule(env, admin, adRuleParams.id);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "ad_rules", resourceId: adRuleParams.id, action: method === "PUT" ? "update" : "delete",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        if (method === "POST" && path === "/api/review-blocks") {
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitCreateReviewBlock(env, admin, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "review_blocks", action: "create",
+            success: result.ok, statusCode: result.ok ? 201 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data }, 201);
+        }
+
+        const reviewBlockParams = matchPath("/api/review-blocks/:id", path);
+        if (reviewBlockParams && (method === "PUT" || method === "DELETE")) {
+          const payload = method === "PUT" ? await request.json().catch(() => ({})) : null;
+          const result =
+            method === "PUT"
+              ? await submitUpdateReviewBlock(env, admin, reviewBlockParams.id, payload)
+              : await submitDeleteReviewBlock(env, admin, reviewBlockParams.id);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "review_blocks", resourceId: reviewBlockParams.id, action: method === "PUT" ? "update" : "delete",
             success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
             errorMessage: result.ok ? null : result.message || result.error || result.reason,
             requestId, ipHash
@@ -738,6 +838,13 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
     }
   }
 
+  if (section === "content") {
+    const reviewBlocksParams = matchPath("/content/reviews/:slug/blocks", path);
+    if (method === "GET" && reviewBlocksParams) {
+      return html(await renderReviewBlocksPage(env, admin, reviewBlocksParams.slug));
+    }
+  }
+
   const newParams = matchPath(`/${section}/:resource/new`, path);
   const editParams = matchPath(`/${section}/:resource/:id/edit`, path);
   const deleteParams = matchPath(`/${section}/:resource/:id/delete`, path);
@@ -824,7 +931,7 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
   }
 
   if (method === "GET" && listParams) {
-    return html(await renderResourceList(env, admin, resourceKey, config, readFlash(new URL(request.url))));
+    return html(await renderResourceList(env, admin, resourceKey, config, readFlash(new URL(request.url)), new URL(request.url).searchParams));
   }
 
   return null;

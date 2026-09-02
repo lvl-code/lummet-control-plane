@@ -27,6 +27,7 @@ const NAV = [
       { label: "Casinos", href: "/content/casinos", key: "content-casinos" },
       { label: "Reviews", href: "/content/reviews", key: "content-reviews" },
       { label: "News", href: "/content/news", key: "content-news" },
+      { label: "Updates", href: "/content/updates", key: "content-updates" },
       { label: "Pages", href: "/content/pages", key: "content-pages" },
       { label: "Categories", href: "/content/categories", key: "content-categories" },
       { label: "Countries", href: "/content/countries", key: "content-countries" }

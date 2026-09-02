@@ -128,17 +128,17 @@ export const RESOURCES = {
       { name: "country_code", label: "Country code", type: "text", lockOnEdit: true },
       { name: "title", label: "Title", type: "text", required: true },
       { name: "content", label: "Content", type: "richtext", required: true },
-      { name: "overview", label: "Overview", type: "textarea" },
-      { name: "games", label: "Games", type: "textarea" },
-      { name: "bonuses", label: "Bonuses", type: "textarea" },
-      { name: "payments", label: "Payments", type: "textarea" },
-      { name: "licenses", label: "Licenses", type: "textarea" },
-      { name: "verdict", label: "Verdict", type: "textarea" },
+      { name: "overview", label: "Overview", type: "richtext" },
+      { name: "games", label: "Games", type: "richtext" },
+      { name: "bonuses", label: "Bonuses", type: "richtext" },
+      { name: "payments", label: "Payments", type: "richtext" },
+      { name: "licenses", label: "Licenses", type: "richtext" },
+      { name: "verdict", label: "Verdict", type: "richtext" },
       { name: "pros", label: "Pros", type: "list", hint: "one per line" },
       { name: "cons", label: "Cons", type: "list", hint: "one per line" },
       { name: "faq_json", label: "FAQ", type: "json_raw" },
       { name: "rating", label: "Rating", type: "number", step: "0.1" },
-      { name: "author_id", label: "Author ID", type: "number" },
+      { name: "author_id", label: "Author", type: "resource_select", optionsResource: "authors", optionValueKey: "id", optionLabelKey: "name" },
       { name: "seo_title", label: "SEO title", type: "text" },
       { name: "seo_description", label: "SEO description", type: "textarea" }
     ]
@@ -163,7 +163,7 @@ export const RESOURCES = {
       { name: "content", label: "Content", type: "richtext", required: true },
       { name: "excerpt", label: "Excerpt", type: "textarea" },
       { name: "author", label: "Author name", type: "text" },
-      { name: "author_id", label: "Author ID", type: "number" },
+      { name: "author_id", label: "Author", type: "resource_select", optionsResource: "authors", optionValueKey: "id", optionLabelKey: "name" },
       { name: "tags", label: "Tags", type: "text", hint: "comma-separated" },
       { name: "featured_image", label: "Featured image", type: "media" },
       // IMPORTANT: updateNews defaults published to 1 whenever the
@@ -174,6 +174,33 @@ export const RESOURCES = {
       { name: "published_at", label: "Published at", type: "text", hint: "ISO date, optional" },
       { name: "ad_mode", label: "Ad mode", type: "select", options: ["auto", "disable"] },
       { name: "ai_generated", label: "AI generated", type: "checkbox" },
+      { name: "seo_title", label: "SEO title", type: "text" },
+      { name: "seo_description", label: "SEO description", type: "textarea" }
+    ]
+  },
+
+  updates: {
+    label: "Updates",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: true,
+    listColumns: [
+      { key: "title", label: "Title" },
+      { key: "slug", label: "Slug" },
+      { key: "published", label: "Published", type: "bool" },
+      { key: "featured", label: "Featured", type: "bool" }
+    ],
+    fields: [
+      { name: "slug", label: "Slug", type: "text", required: true },
+      { name: "title", label: "Title", type: "text", required: true },
+      { name: "content", label: "Content", type: "richtext", required: true },
+      { name: "excerpt", label: "Excerpt", type: "textarea" },
+      { name: "author_id", label: "Author", type: "resource_select", optionsResource: "authors", optionValueKey: "id", optionLabelKey: "name" },
+      { name: "featured_image", label: "Featured image", type: "media" },
+      { name: "published", label: "Published", type: "checkbox" },
+      { name: "featured", label: "Featured", type: "checkbox" },
+      { name: "published_at", label: "Published at", type: "text", hint: "ISO date, optional" },
       { name: "seo_title", label: "SEO title", type: "text" },
       { name: "seo_description", label: "SEO description", type: "textarea" }
     ]
@@ -201,7 +228,7 @@ export const RESOURCES = {
       { name: "template", label: "Template", type: "text", required: true, lockOnEdit: true },
       { name: "title", label: "Title", type: "text", required: true },
       { name: "content_json", label: "Content", type: "json_object" },
-      { name: "author_id", label: "Author ID", type: "number" },
+      { name: "author_id", label: "Author", type: "resource_select", optionsResource: "authors", optionValueKey: "id", optionLabelKey: "name" },
       { name: "seo_title", label: "SEO title", type: "text" },
       { name: "seo_description", label: "SEO description", type: "textarea" }
     ]
@@ -356,11 +383,11 @@ export const RESOURCES = {
       // ONLY position and injection_point — page_type, page_slug,
       // and component_id are genuinely immutable once assigned
       // (assign a new block instead of trying to repoint one).
-      { name: "page_type", label: "Page type", type: "text", required: true, lockOnEdit: true },
+      { name: "page_type", label: "Page type", type: "select", required: true, lockOnEdit: true, options: ["all", "homepage", "casino", "review", "news", "category", "page", "country", "author"] },
       { name: "page_slug", label: "Page slug", type: "text", required: true, lockOnEdit: true, hint: "'*' matches all pages of this type" },
-      { name: "component_id", label: "Component ID", type: "number", required: true, lockOnEdit: true },
+      { name: "component_id", label: "Component", type: "resource_select", required: true, lockOnEdit: true, optionsResource: "components", optionValueKey: "id", optionLabelKey: "name" },
       { name: "position", label: "Position", type: "number" },
-      { name: "injection_point", label: "Injection point", type: "text", hint: "e.g. content_bottom" },
+      { name: "injection_point", label: "Injection point", type: "select", options: ["top", "content_top", "content_bottom", "bottom", "sidebar"] },
       { name: "enabled", label: "Enabled", type: "checkbox" }
     ]
   },

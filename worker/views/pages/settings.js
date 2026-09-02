@@ -1,8 +1,17 @@
 import { renderShell, escapeHtml } from "../layout.js";
-import { getFromTenant, putToTenant, messageForStatus } from "../../client.js";
+import { getFromTenant, putToTenant, postToTenant, messageForStatus } from "../../client.js";
 import { getTenant } from "../../registry.js";
 
 const BASE_PATH = "/en/api/super/settings";
+const AD_RULES_PATH = "/en/api/super/ad-rules";
+const COMPONENTS_PATH = "/en/api/super/components";
+
+const AD_PLACEMENTS = [
+  "after_paragraph", "before_paragraph", "end_of_article", "before_article",
+  "after_heading", "before_heading", "after_first_image", "middle_of_article"
+];
+const AD_DEVICES = ["all", "desktop", "mobile", "tablet"];
+const AD_PAGE_TYPES = ["all", "news", "review", "casino", "category", "page"];
 
 export async function renderSettingsPage(env, admin, flash) {
   if (!admin.activeTenantId) {
@@ -48,6 +57,108 @@ export async function renderSettingsPage(env, admin, flash) {
     )
     .join("");
 
+  const [adRulesResult, componentsResult] = await Promise.all([
+    getFromTenant(env, tenant, AD_RULES_PATH),
+    getFromTenant(env, tenant, COMPONENTS_PATH)
+  ]);
+  const adRules = adRulesResult.ok ? adRulesResult.data.data || [] : [];
+  const components = componentsResult.ok ? componentsResult.data.data || [] : [];
+
+  const componentOptionsHtml = (selectedId) =>
+    components
+      .map((c) => `<option value="${escapeHtml(c.id)}" ${String(c.id) === String(selectedId) ? "selected" : ""}>${escapeHtml(c.name)}</option>`)
+      .join("");
+  const selectOptionsHtml = (values, selected) =>
+    values.map((v) => `<option value="${escapeHtml(v)}" ${v === selected ? "selected" : ""}>${escapeHtml(v)}</option>`).join("");
+
+  const adRuleRowHtml = (rule) => `
+    <tr data-ad-rule-row="${rule.id}">
+      <td style="padding:6px 8px;"><input type="checkbox" data-ad-field="enabled" ${rule.enabled ? "checked" : ""} style="width:auto;margin:0;" /></td>
+      <td style="padding:6px 8px;"><select data-ad-field="component_id" style="width:auto;">${componentOptionsHtml(rule.component_id)}</select></td>
+      <td style="padding:6px 8px;"><select data-ad-field="placement" style="width:auto;">${selectOptionsHtml(AD_PLACEMENTS, rule.placement)}</select></td>
+      <td style="padding:6px 8px;"><input type="number" data-ad-field="position_value" value="${escapeHtml(rule.position_value ?? 3)}" style="width:60px;margin:0;" /></td>
+      <td style="padding:6px 8px;"><select data-ad-field="page_type" style="width:auto;">${selectOptionsHtml(AD_PAGE_TYPES, rule.page_type)}</select></td>
+      <td style="padding:6px 8px;"><select data-ad-field="devices" style="width:auto;">${selectOptionsHtml(AD_DEVICES, rule.devices)}</select></td>
+      <td style="padding:6px 8px;"><input type="number" data-ad-field="max_appearances" value="${escapeHtml(rule.max_appearances ?? 1)}" style="width:50px;margin:0;" /></td>
+      <td style="padding:6px 8px;"><input type="number" data-ad-field="priority" value="${escapeHtml(rule.priority ?? 100)}" style="width:55px;margin:0;" /></td>
+      <td style="padding:6px 8px;white-space:nowrap;">
+        <button type="button" class="btn btn-secondary btn-small" data-ad-save="${rule.id}">Save</button>
+        <button type="button" class="btn btn-secondary btn-small" data-ad-delete="${rule.id}" style="color:var(--danger);">✕</button>
+      </td>
+    </tr>`;
+
+  const adRulesHtml = `
+    <div class="card" style="margin-top:20px;">
+      <h3 style="margin-top:0;">Ad automation rules</h3>
+      <p style="font-size:13px;color:var(--text-dim);">Crude but functional — same rules engine as the tenant's own admin. Each row auto-targets ad component placements across the site; nothing here saves until you press that row's Save.</p>
+      ${
+        components.length === 0
+          ? `<p style="color:var(--text-dim);font-size:13px;">No components exist on this tenant yet — create one under System → Components first (an ad rule just decides where/when an existing component shows up).</p>`
+          : `
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr style="font-size:11px;color:var(--text-dim);">
+            <th>On</th><th>Component</th><th>Placement</th><th>Pos.</th><th>Page type</th><th>Devices</th><th>Max</th><th>Priority</th><th></th>
+          </tr></thead>
+          <tbody id="adRulesBody">
+            ${adRules.map(adRuleRowHtml).join("") || `<tr><td colspan="9" style="padding:10px 8px;color:var(--text-dim);">No rules yet.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+      <div style="border-top:1px solid var(--panel-border);margin:14px 0;padding-top:12px;">
+        <label>Add a rule</label>
+        <table><tbody><tr data-ad-rule-row="new">
+          <td style="padding:6px 8px;"><input type="checkbox" data-ad-field="enabled" checked style="width:auto;margin:0;" /></td>
+          <td style="padding:6px 8px;"><select data-ad-field="component_id" style="width:auto;"><option value="">—</option>${componentOptionsHtml(null)}</select></td>
+          <td style="padding:6px 8px;"><select data-ad-field="placement" style="width:auto;">${selectOptionsHtml(AD_PLACEMENTS, "after_paragraph")}</select></td>
+          <td style="padding:6px 8px;"><input type="number" data-ad-field="position_value" value="3" style="width:60px;margin:0;" /></td>
+          <td style="padding:6px 8px;"><select data-ad-field="page_type" style="width:auto;">${selectOptionsHtml(AD_PAGE_TYPES, "all")}</select></td>
+          <td style="padding:6px 8px;"><select data-ad-field="devices" style="width:auto;">${selectOptionsHtml(AD_DEVICES, "all")}</select></td>
+          <td style="padding:6px 8px;"><input type="number" data-ad-field="max_appearances" value="1" style="width:50px;margin:0;" /></td>
+          <td style="padding:6px 8px;"><input type="number" data-ad-field="priority" value="100" style="width:55px;margin:0;" /></td>
+          <td style="padding:6px 8px;"><button type="button" class="btn btn-small" id="adRuleAddBtn">Add</button></td>
+        </tr></tbody></table>
+      </div>`
+      }
+    </div>
+    <script>
+      function adRuleReadRow(tr) {
+        const body = {};
+        tr.querySelectorAll("[data-ad-field]").forEach((el) => {
+          const key = el.dataset.adField;
+          body[key] = el.type === "checkbox" ? el.checked : el.value;
+        });
+        return body;
+      }
+      async function adRuleApi(path, method, body) {
+        const res = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+        const data = await res.json().catch(() => ({}));
+        if (!data.success) alert("Could not save: " + (data.message || data.error || "unknown error"));
+        return data.success;
+      }
+      document.body.addEventListener("click", (e) => {
+        const saveBtn = e.target.closest("[data-ad-save]");
+        if (saveBtn) {
+          const tr = saveBtn.closest("tr");
+          adRuleApi("/api/ad-rules/" + saveBtn.dataset.adSave, "PUT", adRuleReadRow(tr));
+          return;
+        }
+        const delBtn = e.target.closest("[data-ad-delete]");
+        if (delBtn) {
+          if (!confirm("Delete this ad rule?")) return;
+          adRuleApi("/api/ad-rules/" + delBtn.dataset.adDelete, "DELETE").then((ok) => { if (ok) location.reload(); });
+          return;
+        }
+        const addBtn = e.target.closest("#adRuleAddBtn");
+        if (addBtn) {
+          const tr = addBtn.closest("tr");
+          const body = adRuleReadRow(tr);
+          if (!body.component_id) { alert("Pick a component first."); return; }
+          adRuleApi("/api/ad-rules", "POST", body).then((ok) => { if (ok) location.reload(); });
+        }
+      });
+    </script>`;
+
   const body = `
     <h1>Settings</h1>
     <p class="subtitle">System · Settings on <strong>${escapeHtml(tenant.name)}</strong></p>
@@ -73,6 +184,7 @@ export async function renderSettingsPage(env, admin, flash) {
         <button class="btn" type="submit">Save settings</button>
       </form>
     </div>
+    ${adRulesHtml}
   `;
 
   return renderShell({ title: "Settings", activeKey: "system-settings", admin, bodyHtml: body, env });
@@ -102,4 +214,28 @@ export async function submitSettings(env, admin, form) {
   }
 
   return putToTenant(env, tenant, BASE_PATH, payload);
+}
+
+async function resolveTenantOrNull(env, admin) {
+  if (!admin.activeTenantId) return null;
+  return getTenant(env, admin.activeTenantId);
+}
+
+export async function submitCreateAdRule(env, admin, payload) {
+  const tenant = await resolveTenantOrNull(env, admin);
+  if (!tenant) return { ok: false, status: 422, reason: "no_active_tenant" };
+  return postToTenant(env, tenant, AD_RULES_PATH, payload);
+}
+
+export async function submitUpdateAdRule(env, admin, id, payload) {
+  const tenant = await resolveTenantOrNull(env, admin);
+  if (!tenant) return { ok: false, status: 422, reason: "no_active_tenant" };
+  return putToTenant(env, tenant, `${AD_RULES_PATH}/${encodeURIComponent(id)}`, payload);
+}
+
+export async function submitDeleteAdRule(env, admin, id) {
+  const tenant = await resolveTenantOrNull(env, admin);
+  if (!tenant) return { ok: false, status: 422, reason: "no_active_tenant" };
+  const { deleteFromTenant } = await import("../../client.js");
+  return deleteFromTenant(env, tenant, `${AD_RULES_PATH}/${encodeURIComponent(id)}`);
 }

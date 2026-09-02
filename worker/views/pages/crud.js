@@ -88,18 +88,19 @@ function formatBytes(bytes) {
 }
 
 function renderMediaGrid(rows, base, config) {
+  const PAGE_SIZE = 24;
   const cards = rows
-    .map((row) => {
+    .map((row, i) => {
       const id = row.id;
-      const thumb = row.thumbnail_url || row.url;
       const dims = row.width && row.height ? `${row.width}×${row.height}` : "";
       const meta = [dims, formatBytes(row.size)].filter(Boolean).join(" · ");
+      const page = Math.floor(i / PAGE_SIZE) + 1;
       return `
-        <div class="media-card" style="border:1px solid var(--panel-border);border-radius:10px;overflow:hidden;background:var(--panel-bg,transparent);">
-          <a href="${base}/${encodeURIComponent(id)}/edit" style="display:block;aspect-ratio:1/1;background:repeating-conic-gradient(#00000010 0% 25%, transparent 0% 50%) 50% / 16px 16px;">
+        <div class="media-card" data-media-page="${page}" style="border:1px solid var(--panel-border);border-radius:10px;overflow:hidden;background:var(--panel-bg,transparent);">
+          <a href="#" data-media-preview="${escapeHtml(row.url || "")}" data-media-label="${escapeHtml(row.filename || "")}" style="display:block;aspect-ratio:1/1;background:repeating-conic-gradient(#00000010 0% 25%, transparent 0% 50%) 50% / 16px 16px;">
             ${
-              thumb
-                ? `<img src="${escapeHtml(thumb)}" alt="${escapeHtml(row.alt_text || row.filename || "")}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;" />`
+              row.url
+                ? `<img src="${escapeHtml(row.url)}" alt="${escapeHtml(row.alt_text || row.filename || "")}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;" />`
                 : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:12px;">No preview</div>`
             }
           </a>
@@ -119,10 +120,69 @@ function renderMediaGrid(rows, base, config) {
     })
     .join("");
 
-  return `<div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));gap:14px;">${cards}</div>`;
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+
+  return `
+    <div id="mediaGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));gap:14px;">${cards}</div>
+    ${
+      totalPages > 1
+        ? `<div style="display:flex;justify-content:center;align-items:center;gap:14px;margin-top:18px;">
+            <button type="button" class="btn btn-secondary btn-small" id="mediaPrevBtn">&larr; Prev</button>
+            <span id="mediaPageLabel" style="font-size:13px;color:var(--text-dim);"></span>
+            <button type="button" class="btn btn-secondary btn-small" id="mediaNextBtn">Next &rarr;</button>
+          </div>`
+        : ""
+    }
+
+    <!-- Click-to-preview lightbox: a real full-size look at the
+         image, since the grid above is necessarily cropped thumbnails. -->
+    <div id="mediaLightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:center;justify-content:center;cursor:zoom-out;">
+      <img id="mediaLightboxImg" src="" alt="" style="max-width:92vw;max-height:88vh;object-fit:contain;box-shadow:0 10px 40px rgba(0,0,0,0.5);" />
+      <div id="mediaLightboxLabel" style="position:absolute;bottom:20px;left:0;right:0;text-align:center;color:#fff;font-size:13px;"></div>
+    </div>
+    <script>
+      (function() {
+        const PAGE_SIZE = ${PAGE_SIZE};
+        const cards = Array.from(document.querySelectorAll("[data-media-page]"));
+        const totalPages = ${totalPages};
+        let currentPage = 1;
+
+        function showPage(p) {
+          currentPage = Math.min(Math.max(1, p), totalPages);
+          cards.forEach((c) => {
+            c.style.display = Number(c.dataset.mediaPage) === currentPage ? "" : "none";
+          });
+          const label = document.getElementById("mediaPageLabel");
+          if (label) label.textContent = "Page " + currentPage + " of " + totalPages;
+          const prevBtn = document.getElementById("mediaPrevBtn");
+          const nextBtn = document.getElementById("mediaNextBtn");
+          if (prevBtn) prevBtn.disabled = currentPage <= 1;
+          if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
+        }
+
+        document.getElementById("mediaPrevBtn")?.addEventListener("click", () => showPage(currentPage - 1));
+        document.getElementById("mediaNextBtn")?.addEventListener("click", () => showPage(currentPage + 1));
+        showPage(1);
+
+        const lightbox = document.getElementById("mediaLightbox");
+        const lightboxImg = document.getElementById("mediaLightboxImg");
+        const lightboxLabel = document.getElementById("mediaLightboxLabel");
+        document.getElementById("mediaGrid")?.addEventListener("click", (e) => {
+          const trigger = e.target.closest("[data-media-preview]");
+          if (!trigger) return;
+          e.preventDefault();
+          const url = trigger.dataset.mediaPreview;
+          if (!url) return;
+          lightboxImg.src = url;
+          lightboxLabel.textContent = trigger.dataset.mediaLabel || "";
+          lightbox.style.display = "flex";
+        });
+        lightbox?.addEventListener("click", () => { lightbox.style.display = "none"; lightboxImg.src = ""; });
+      })();
+    </script>`;
 }
 
-export async function renderResourceList(env, admin, resourceKey, config, flash) {
+export async function renderResourceList(env, admin, resourceKey, config, flash, searchParams) {
   const activeKey = nav(resourceKey, config);
   const { tenant } = await resolveActiveTenant(env, admin);
 
@@ -132,11 +192,30 @@ export async function renderResourceList(env, admin, resourceKey, config, flash)
     return capabilityDisabledNotice(env, admin, config, tenant, activeKey);
   }
 
-  const result = await getFromTenant(env, tenant, `${BASE_PATH}/${resourceKey}`);
+  const selectedFolder = resourceKey === "media" ? (searchParams?.get("folder") || "") : "";
+  const listPath = selectedFolder
+    ? `${BASE_PATH}/${resourceKey}?folder=${encodeURIComponent(selectedFolder)}`
+    : `${BASE_PATH}/${resourceKey}`;
+
+  const result = await getFromTenant(env, tenant, listPath);
   if (!result.ok) return errorNotice(env, admin, config, tenant, activeKey, result);
 
   const rows = result.data.data || [];
   const base = basePagePath(resourceKey, config);
+
+  let folderPickerHtml = "";
+  if (resourceKey === "media") {
+    const foldersResult = await getFromTenant(env, tenant, `${BASE_PATH}/media/folders`);
+    const folders = foldersResult.ok ? foldersResult.data.data || [] : [];
+    folderPickerHtml = `
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
+        <label for="folderFilter" style="margin:0;font-size:13px;color:var(--text-dim);">Folder</label>
+        <select id="folderFilter" style="width:auto;margin:0;" onchange="location.href = this.value ? '${base}?folder=' + encodeURIComponent(this.value) : '${base}';">
+          <option value="">All folders</option>
+          ${folders.map((f) => `<option value="${escapeHtml(f)}" ${f === selectedFolder ? "selected" : ""}>${escapeHtml(f)}</option>`).join("")}
+        </select>
+      </div>`;
+  }
 
   const flashHtml = flash
     ? `<div class="flash ${flash.type === "error" ? "flash-error" : "flash-success"}">${escapeHtml(flash.message)}</div>`
@@ -151,9 +230,10 @@ export async function renderResourceList(env, admin, resourceKey, config, flash)
         config.supportsCreate
           ? `<div style="display:flex;justify-content:flex-end;margin-bottom:14px;"><a class="btn" href="${base}/new">New</a></div>`
           : resourceKey === "media"
-            ? `<div style="display:flex;justify-content:flex-end;margin-bottom:14px;"><a class="btn" href="${base}/new">Upload</a></div>`
+            ? `<div style="display:flex;justify-content:flex-end;margin-bottom:14px;"><a class="btn" href="${base}/new">Upload / Add</a></div>`
             : ""
       }
+      ${folderPickerHtml}
       ${
         rows.length === 0
           ? `<div class="empty">Nothing here yet.</div>`
@@ -249,6 +329,14 @@ function renderField(field, record, fieldOptions) {
     return renderGeoRulesField(field, rawStoredValue, (fieldOptions && fieldOptions[field.optionsResource]) || []);
   }
 
+  if (field.type === "resource_select") {
+    return renderResourceSelectField(field, rawStoredValue, (fieldOptions && fieldOptions[field.optionsResource]) || []);
+  }
+
+  if (field.type === "content_json_rich") {
+    return renderPageContentField(field, rawStoredValue);
+  }
+
   if (field.type === "json_object") {
     // Stored as a real object/array (e.g. pages.content_json) — the
     // DB layer JSON.stringify()s it itself, so we pretty-print for
@@ -318,6 +406,58 @@ function renderField(field, record, fieldOptions) {
 }
 
 // -----------------------------------------------------
+// Page content — pages.content_json is stored as a JSON-encoded
+// TEXT column, but the tenant's own admin (en/static/js/admin.js)
+// treats it as effectively plain text/HTML: if what's typed isn't
+// valid JSON, it's wrapped as { text: <what was typed> } before
+// saving (see parseContentJson on the tenant, which then unwraps
+// {text}/{html}/plain-string shapes back out for rendering). So for
+// the common case, editing this field should just be the same rich
+// text editor reviews/news content gets — no JSON in sight.
+//
+// The one thing this must not do is silently mangle a page that
+// already has genuine multi-key structured content (a real little
+// JSON object beyond {text} or {html}) — those fall back to the raw
+// JSON editor so nothing is destroyed.
+// -----------------------------------------------------
+
+function parsePageContentForEdit(rawStoredValue) {
+  let obj = null;
+  if (rawStoredValue && typeof rawStoredValue === "object") {
+    obj = rawStoredValue;
+  } else if (typeof rawStoredValue === "string" && rawStoredValue.trim()) {
+    try {
+      obj = JSON.parse(rawStoredValue);
+    } catch {
+      // Not JSON at all — treat the raw string itself as the HTML/text.
+      return { html: rawStoredValue, complex: false };
+    }
+  }
+  if (obj == null) return { html: "", complex: false };
+  if (typeof obj === "string") return { html: obj, complex: false };
+  if (typeof obj !== "object") return { html: "", complex: false };
+  const keys = Object.keys(obj);
+  if (keys.length === 0) return { html: "", complex: false };
+  if (keys.length === 1 && keys[0] === "text") return { html: obj.text || "", complex: false };
+  if (keys.length === 1 && keys[0] === "html") return { html: obj.html || "", complex: false };
+  return { html: "", complex: true, raw: JSON.stringify(obj, null, 2) };
+}
+
+function renderPageContentField(field, rawStoredValue) {
+  const parsed = parsePageContentForEdit(rawStoredValue);
+
+  if (parsed.complex) {
+    return `
+      <label for="${field.name}">${escapeHtml(field.label)} <span style="color:var(--text-dim);font-weight:400;">— this page has custom structured content beyond plain text/HTML, so it's shown as raw JSON here to avoid losing anything</span></label>
+      <textarea id="${field.name}" name="${field.name}" rows="10" class="mono" data-json-field="1">${escapeHtml(parsed.raw)}</textarea>
+      <div class="json-error" style="display:none;color:var(--danger);font-size:12px;margin:-10px 0 14px;"></div>
+      <input type="hidden" name="${field.name}__mode" value="json" />`;
+  }
+
+  return renderRichTextField(field, parsed.html) + `<input type="hidden" name="${field.name}__mode" value="richtext" />`;
+}
+
+// -----------------------------------------------------
 // Rich text editor — a minimal, self-contained contenteditable
 // editor with no external/CDN dependency. Its output is a plain
 // HTML string synced into a hidden textarea on every input, which
@@ -329,7 +469,7 @@ function renderField(field, record, fieldOptions) {
 
 let richTextInstanceCounter = 0;
 
-function renderRichTextField(field, html) {
+export function renderRichTextField(field, html) {
   const instanceId = `rte_${field.name}_${richTextInstanceCounter++}`;
   return `
     <label for="${instanceId}_editor">${escapeHtml(field.label)}</label>
@@ -477,6 +617,30 @@ function renderMediaPickerField(field, currentId) {
           '<span style="color:var(--text-dim);font-size:12px;">No image selected</span>';
       };
     </script>`;
+}
+
+// -----------------------------------------------------
+// Resource select — a single-value dropdown sourced from another
+// resource (e.g. reviews/news/pages.author_id -> authors,
+// blocks.component_id -> components). Replaces having to know and
+// type a raw numeric id by hand.
+// -----------------------------------------------------
+
+function renderResourceSelectField(field, currentValue, options) {
+  const current = currentValue == null ? "" : String(currentValue);
+  const optionsHtml = options
+    .map((opt) => {
+      const optValue = String(opt[field.optionValueKey]);
+      const optLabel = String(opt[field.optionLabelKey] ?? optValue);
+      return `<option value="${escapeHtml(optValue)}" ${current === optValue ? "selected" : ""}>${escapeHtml(optLabel)}</option>`;
+    })
+    .join("");
+  return `
+    <label for="${field.name}">${escapeHtml(field.label)}${field.hint ? ` <span style="color:var(--text-dim);font-weight:400;">— ${escapeHtml(field.hint)}</span>` : ""}</label>
+    <select id="${field.name}" name="${field.name}" ${field.required ? "required" : ""}>
+      <option value="">${field.required ? "Select…" : "— none —"}</option>
+      ${optionsHtml}
+    </select>`;
 }
 
 // -----------------------------------------------------
@@ -688,6 +852,13 @@ export async function renderResourceForm(env, admin, resourceKey, config, id, fo
         <button class="btn" type="submit">${isEdit ? "Save changes" : "Create"}</button>
         <a class="btn btn-secondary" href="${base}">Cancel</a>
       </form>
+      ${
+        resourceKey === "reviews" && isEdit
+          ? `<div style="border-top:1px solid var(--panel-border);margin-top:18px;padding-top:14px;">
+              <a class="btn btn-secondary" href="/content/reviews/${encodeURIComponent(id)}/blocks">Manage extra content blocks</a>
+            </div>`
+          : ""
+      }
     </div>
   `;
 
@@ -740,7 +911,7 @@ const NON_WRITABLE_FIELDS = new Set([
  * JSON, which the caller turns into a form-level validation error
  * shown to the admin — never silently sent as malformed data.
  */
-function coerceFieldValue(field, rawValue) {
+function coerceFieldValue(field, rawValue, form) {
   switch (field.type) {
     case "checkbox":
       return rawValue === "1";
@@ -779,6 +950,9 @@ function coerceFieldValue(field, rawValue) {
     case "media":
       return rawValue === "" || rawValue == null ? null : Number(rawValue);
 
+    case "resource_select":
+      return rawValue === "" || rawValue == null ? null : (field.castTo === "string" ? rawValue : Number(rawValue));
+
     case "multi_select": {
       const text = (rawValue ?? "").trim();
       if (!text) return [];
@@ -807,6 +981,24 @@ function coerceFieldValue(field, rawValue) {
     case "richtext":
       return rawValue ?? "";
 
+    case "content_json_rich": {
+      const mode = form?.[`${field.name}__mode`] || "richtext";
+      if (mode === "json") {
+        const text = (rawValue ?? "").trim();
+        if (!text) return {};
+        try {
+          return JSON.parse(text);
+        } catch (error) {
+          throw new Error(`"${field.label}" is not valid JSON: ${error.message}`);
+        }
+      }
+      // richtext mode: wrap as { text: html } — exactly what the
+      // tenant's own admin.js falls back to when what's typed isn't
+      // valid JSON (see the comment above renderPageContentField),
+      // so pages rendered this way display identically either path.
+      return { text: rawValue ?? "" };
+    }
+
     default: // "text", "select", "textarea"
       return rawValue === "" || rawValue == null ? null : rawValue;
   }
@@ -815,7 +1007,7 @@ function coerceFieldValue(field, rawValue) {
 function coerceFormValues(config, form) {
   const body = {};
   for (const field of config.fields) {
-    body[field.name] = coerceFieldValue(field, form[field.name]);
+    body[field.name] = coerceFieldValue(field, form[field.name], form);
   }
   return body;
 }
