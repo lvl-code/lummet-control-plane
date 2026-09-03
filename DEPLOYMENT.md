@@ -152,19 +152,21 @@ replacing `REPLACE_WITH_ACTUAL_D1_DATABASE_ID`.
 wrangler d1 execute lummet-control-plane-db --file=migrations/0001_control_plane.sql --remote
 wrangler d1 execute lummet-control-plane-db --file=migrations/0002_lummet_cms.sql --remote
 wrangler d1 execute lummet-control-plane-db --file=migrations/0003_lummet_admin_rbac.sql --remote
+wrangler d1 execute lummet-control-plane-db --file=migrations/0004_lummet_homepage_sections.sql --remote
 ```
 
 `0002` adds Lummet's own CMS tables (pages, authors, brands,
 partners, updates, publications, advertisements, homepage settings).
-`0003` adds the staff-account RBAC tables. Both are additive — safe
-to run on an existing deployment that only has `0001` applied, and
-the homepage/nav code falls back gracefully if `0002`/`0003` haven't
+`0003` adds the staff-account RBAC tables. `0004` adds the homepage
+sections table (Phase 9.1). All three are additive — safe to run on
+an existing deployment that only has `0001` applied, and the
+homepage/nav code falls back gracefully if a later migration hasn't
 run yet (new nav sections/CMS just won't have anywhere to write, and
 `renderPublicHomepage` catches the failure and falls back to its
-built-in defaults). Run them before granting any staff account
-access, though — until `0003` is applied, every non-bootstrap admin
-account creation will fail since `lummet_admins.status` doesn't exist
-yet.
+built-in defaults). Run `0002`/`0003` before granting any staff
+account access, though — until `0003` is applied, every
+non-bootstrap admin account creation will fail since
+`lummet_admins.status` doesn't exist yet.
 
 ### 2.4 Generate and set the credential encryption key
 
@@ -216,7 +218,10 @@ only): pick "Staff" as the role, and a temporary password is shown
 exactly once — copy it before leaving the page, then grant that
 staff account whichever tenants and Content/System/CMS resources
 they need from their detail page (`/platform/admins/:id`). A fresh
-staff account has zero access until you grant it.
+staff account has zero access until you grant it, and is forced to
+`/account/password` to set a real password before it can use
+anything else. Any admin can change their password later from the
+"Change password" link in the topbar.
 
 ### 2.8 Set up lummet.com's own homepage/content
 

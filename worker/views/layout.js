@@ -66,6 +66,7 @@ const NAV = [
       { label: "Updates", href: "/cms/updates", key: "cms-updates", area: "cms", resource: "updates" },
       { label: "Publications", href: "/cms/publications", key: "cms-publications", area: "cms", resource: "publications" },
       { label: "Advertisements", href: "/cms/advertisements", key: "cms-advertisements", area: "cms", resource: "advertisements" },
+      { label: "Homepage sections", href: "/cms/homepage_sections", key: "cms-homepage-sections", area: "cms", resource: "homepage_sections" },
       { label: "Homepage settings", href: "/cms/settings", key: "cms-site-settings", area: "cms", resource: "site_settings" }
     ]
   },
@@ -345,6 +346,7 @@ export async function renderShell({ title, activeKey, admin, bodyHtml, env }) {
       ${admin ? renderTenantSwitcher(tenants, admin.activeTenantId) : "<div></div>"}
       <div class="topbar-right">
         <div class="who">${admin ? escapeHtml(admin.email) : ""}${admin ? ` <span class="role-badge">${escapeHtml(isSuper ? "super admin" : "staff")}</span>` : ""}</div>
+        ${admin ? `<a class="logout" href="/account/password">Change password</a>` : ""}
         ${admin ? `<a class="logout" href="#" onclick="fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login');return false;">Log out</a>` : ""}
       </div>
     </div>

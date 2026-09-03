@@ -142,6 +142,10 @@ export async function deleteCmsRecord(env, resourceKey, id) {
 // -----------------------------------------------------
 
 export const SITE_SETTING_KEYS = [
+  "site_name",
+  "logo_url",
+  "accent_color",
+  "accent_color_secondary",
   "hero_eyebrow",
   "hero_title",
   "hero_subtitle",

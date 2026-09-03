@@ -261,6 +261,41 @@ function heroCopy(settings) {
   return out;
 }
 
+function isSafeCssColor(value) {
+  if (!value) return false;
+  const v = value.trim();
+  // Deliberately narrow — this gets interpolated straight into a
+  // <style> block, so only accept shapes that can't break out of a
+  // CSS value (hex, rgb()/rgba() with numeric args, or a bare CSS
+  // color keyword like "indigo").
+  return (
+    /^#[0-9a-fA-F]{3,8}$/.test(v) ||
+    /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*[\d.]+\s*)?\)$/.test(v) ||
+    /^[a-zA-Z]{3,20}$/.test(v)
+  );
+}
+
+function accentOverrideStyle(settings) {
+  const accent = isSafeCssColor(settings.accent_color) ? settings.accent_color.trim() : null;
+  const accent2 = isSafeCssColor(settings.accent_color_secondary) ? settings.accent_color_secondary.trim() : null;
+  if (!accent && !accent2) return "";
+  return `<style>:root{${accent ? `--accent:${accent};` : ""}${accent2 ? `--accent-2:${accent2};` : ""}}</style>`;
+}
+
+function siteName(settings) {
+  return settings.site_name && settings.site_name.trim() ? settings.site_name.trim() : "Lummet";
+}
+
+/** Shared header logo markup — an uploaded logo image if set, otherwise the default dot mark. Always links home, never to the image URL itself. */
+function renderHeaderLogo(settings) {
+  const name = siteName(settings);
+  if (settings.logo_url && settings.logo_url.trim()) {
+    return `<a class="logo" href="/"><img src="${escapeHtml(settings.logo_url)}" alt="${escapeHtml(name)}" style="height:28px;width:auto;display:block;" /></a>`;
+  }
+  return `<a class="logo" href="/"><span class="dot"></span> ${escapeHtml(name)}</a>`;
+}
+
+
 function renderAdBanner(ad) {
   if (!ad) return "";
   const img = `<img src="${escapeHtml(ad.image_url || "")}" alt="${escapeHtml(ad.alt_text || ad.name || "")}" style="width:100%;border-radius:14px;display:block;" />`;
@@ -294,6 +329,38 @@ function renderUpdatesSection(updates) {
         <div class="grid-3">${cards}</div>
       </div>
     </section>`;
+}
+
+function renderHomepageSections(sections) {
+  if (!sections.length) return "";
+  return sections
+    .map((s, i) => {
+      const cta = s.cta_label && s.cta_href
+        ? `<a class="btn btn-secondary" href="${escapeHtml(s.cta_href)}">${escapeHtml(s.cta_label)}</a>`
+        : "";
+      const textBlock = `
+        <div>
+          ${s.subtitle ? `<span class="eyebrow">${escapeHtml(s.subtitle)}</span>` : ""}
+          <h2>${escapeHtml(s.title)}</h2>
+          <div class="lede">${s.body || ""}</div>
+          ${cta ? `<div style="margin-top:16px;">${cta}</div>` : ""}
+        </div>`;
+      const imageBlock = s.image_url
+        ? `<img src="${escapeHtml(s.image_url)}" alt="${escapeHtml(s.title)}" style="width:100%;border-radius:16px;display:block;" />`
+        : "";
+
+      let inner;
+      if (s.layout === "image_left" && imageBlock) {
+        inner = `<div class="hero-grid">${imageBlock}${textBlock}</div>`;
+      } else if (s.layout === "image_right" && imageBlock) {
+        inner = `<div class="hero-grid">${textBlock}${imageBlock}</div>`;
+      } else {
+        inner = `<div style="max-width:720px;">${textBlock}</div>`;
+      }
+
+      return `<section id="section-${s.id}" class="${i % 2 === 1 ? "section-soft" : ""}"><div class="wrap">${inner}</div></section>`;
+    })
+    .join("");
 }
 
 function renderPartnersSection(partners) {
@@ -362,7 +429,7 @@ export function renderPublicStaticPage({ title, heading, bodyText }) {
 <body>
   <header class="site">
     <div class="nav-inner">
-      <a class="logo" href="https://level.casino/media/lummet/1788359639229-55a3643f6bba8b7a.png"><span class="dot"></span> Lummet</a>
+      <a class="logo" href="/"><span class="dot"></span> Lummet</a>
       <a class="btn btn-secondary" href="/">Back to Lummet</a>
     </div>
   </header>
@@ -390,24 +457,33 @@ export function renderPublicStaticPage({ title, heading, bodyText }) {
  * fall through to a normal 404.
  */
 export async function renderPublicCmsPage(env, slug) {
-  const { getPublishedBySlug } = await import("../../cms.js");
+  const { getPublishedBySlug, getSiteSettings } = await import("../../cms.js");
   const page = await getPublishedBySlug(env, "pages", slug);
   if (!page) return null;
+
+  let settings = {};
+  try {
+    settings = await getSiteSettings(env);
+  } catch {
+    // pre-migration or transient error — falls back to defaults below
+  }
+  const name = siteName(settings);
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${escapeHtml(page.seo_title || page.title)} · Lummet</title>
+  <title>${escapeHtml(page.seo_title || page.title)} · ${escapeHtml(name)}</title>
   ${page.seo_description ? `<meta name="description" content="${escapeHtml(page.seo_description)}" />` : ""}
   <style>${STYLES}</style>
+  ${accentOverrideStyle(settings)}
 </head>
 <body>
   <header class="site">
     <div class="nav-inner">
-      <a class="logo" href="https://level.casino/media/lummet/1788359639229-55a3643f6bba8b7a.png"><span class="dot"></span> Lummet</a>
-      <a class="btn btn-secondary" href="/">Back to Lummet</a>
+      ${renderHeaderLogo(settings)}
+      <a class="btn btn-secondary" href="/">Back to ${escapeHtml(name)}</a>
     </div>
   </header>
   <main>
@@ -420,7 +496,7 @@ export async function renderPublicCmsPage(env, slug) {
   </main>
   <footer class="site">
     <div class="wrap footer-bottom">
-      <span>© ${new Date().getFullYear()} Lummet. All rights reserved.</span>
+      <span>© ${new Date().getFullYear()} ${escapeHtml(name)}. All rights reserved.</span>
     </div>
   </footer>
 </body>
@@ -439,33 +515,37 @@ export async function renderPublicHomepage(env, { contactEmail } = {}) {
   let updates = [];
   let partners = [];
   let bannerAd = null;
+  let sections = [];
   try {
-    [settings, updates, partners, bannerAd] = await Promise.all([
+    [settings, updates, partners, bannerAd, sections] = await Promise.all([
       getSiteSettings(env),
       listPublished(env, "updates", 3),
       listPublished(env, "partners", 8),
-      listActiveAdsForPlacement(env, "homepage_banner").then((ads) => ads[0] || null)
+      listActiveAdsForPlacement(env, "homepage_banner").then((ads) => ads[0] || null),
+      listPublished(env, "homepage_sections", 20)
     ]);
   } catch {
-    // First deploy before migration 0002 has run, or a transient D1
-    // error — the homepage still renders with built-in defaults.
+    // First deploy before migration 0002/0004 has run, or a transient
+    // D1 error — the homepage still renders with built-in defaults.
   }
   const hero = heroCopy(settings);
   const effectiveContactEmail = (settings.contact_email && settings.contact_email.trim()) || contactEmail;
   const footerText = (settings.footer_text && settings.footer_text.trim()) || HERO_DEFAULTS.footer_text;
+  const brandName = siteName(settings);
+  const pageTitle = brandName === "Lummet" ? SITE_TITLE : SITE_TITLE.replace(/Lummet/g, brandName);
 
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [
       {
         "@type": "Organization",
-        "name": "Lummet",
+        "name": brandName,
         "url": canonicalUrl,
         "description": SITE_DESCRIPTION
       },
       {
         "@type": "WebSite",
-        "name": "Lummet",
+        "name": brandName,
         "url": canonicalUrl
       }
     ]
@@ -476,26 +556,27 @@ export async function renderPublicHomepage(env, { contactEmail } = {}) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${escapeHtml(SITE_TITLE)}</title>
+  <title>${escapeHtml(pageTitle)}</title>
   <meta name="description" content="${escapeHtml(SITE_DESCRIPTION)}" />
   <link rel="canonical" href="${canonicalUrl}" />
 
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="${escapeHtml(SITE_TITLE)}" />
+  <meta property="og:title" content="${escapeHtml(pageTitle)}" />
   <meta property="og:description" content="${escapeHtml(SITE_DESCRIPTION)}" />
   <meta property="og:url" content="${canonicalUrl}" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="${escapeHtml(SITE_TITLE)}" />
+  <meta name="twitter:title" content="${escapeHtml(pageTitle)}" />
   <meta name="twitter:description" content="${escapeHtml(SITE_DESCRIPTION)}" />
 
   <script type="application/ld+json">${JSON.stringify(structuredData)}</script>
   <style>${STYLES}</style>
+  ${accentOverrideStyle(settings)}
 </head>
 <body>
 
   <header class="site">
     <div class="nav-inner">
-      <a class="logo" href="https://level.casino/media/lummet/1788359639229-55a3643f6bba8b7a.png"><span class="dot"></span> Lummet</a>
+      ${renderHeaderLogo(settings)}
       <nav class="links">
         <a href="#platform">Platform</a>
         <a href="#brands">Brands</a>
@@ -616,6 +697,7 @@ export async function renderPublicHomepage(env, { contactEmail } = {}) {
 
     ${renderUpdatesSection(updates)}
     ${renderPartnersSection(partners)}
+    ${renderHomepageSections(sections)}
 
     <!-- 6. Why Lummet -->
     <section>
@@ -703,7 +785,7 @@ export async function renderPublicHomepage(env, { contactEmail } = {}) {
     <div class="wrap">
       <div class="footer-grid">
         <div>
-          <a class="logo" href="https://level.casino/media/lummet/1788359639229-55a3643f6bba8b7a.png"><span class="dot"></span> Lummet</a>
+          ${renderHeaderLogo(settings)}
           <p style="max-width:280px;margin-top:10px;">${escapeHtml(footerText)}</p>
         </div>
         <nav class="footer-nav">
@@ -717,7 +799,7 @@ export async function renderPublicHomepage(env, { contactEmail } = {}) {
         </nav>
       </div>
       <div class="footer-bottom">
-        <span>© ${new Date().getFullYear()} Lummet. All rights reserved.</span>
+        <span>© ${new Date().getFullYear()} ${escapeHtml(brandName)}. All rights reserved.</span>
       </div>
     </div>
   </footer>

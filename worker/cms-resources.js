@@ -168,6 +168,28 @@ export const CMS_RESOURCES = {
       { name: "end_date", label: "End date", type: "text", hint: "ISO date, optional" },
       { name: "sort_order", label: "Sort order", type: "number" }
     ]
+  },
+
+  homepage_sections: {
+    label: "Homepage sections",
+    table: "lummet_homepage_sections",
+    listColumns: [
+      { key: "title", label: "Title" },
+      { key: "layout", label: "Layout" },
+      { key: "status", label: "Status" }
+    ],
+    orderBy: "sort_order, title",
+    fields: [
+      { name: "title", label: "Title", type: "text", required: true },
+      { name: "subtitle", label: "Subtitle / eyebrow", type: "text" },
+      { name: "body", label: "Body", type: "richtext" },
+      { name: "image_url", label: "Image URL", type: "text", hint: "used when layout is image_left or image_right" },
+      { name: "layout", label: "Layout", type: "select", options: ["text_only", "image_left", "image_right"] },
+      { name: "cta_label", label: "Button label", type: "text" },
+      { name: "cta_href", label: "Button link", type: "text" },
+      { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
+      { name: "sort_order", label: "Sort order", type: "number", hint: "lower shows first, after the built-in Updates/Partners sections" }
+    ]
   }
 };
 

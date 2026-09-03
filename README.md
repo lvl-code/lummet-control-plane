@@ -349,6 +349,56 @@ plane itself:
 
 This closes out Phases 9 and 10 of the master plan.
 
+### Phase 10.1 — Admin self-service password change
+
+Phase 10 issued temporary passwords for new staff accounts but never
+actually gave anyone a way to change them — a real gap, closed here:
+
+- **`/account/password`** — any signed-in admin (staff or super) can
+  change their own password: current password, new password (12+
+  chars), confirmation. Uses the existing `changeOwnPassword` from
+  Phase 10's `auth.js`.
+- **Forced on first login**: any admin with `must_change_password = 1`
+  (set at account creation) is redirected to `/account/password` for
+  every HTML route until they set a real password — enforced
+  server-side in `index.js`, not just a suggestion. API routes are
+  left alone so nothing silently breaks mid-session.
+- A **"Change password"** link is now in the topbar for every admin.
+
+### Phase 9.1 — Site branding & homepage sections
+
+Two things Phase 9 left out: the header/footer still had "Lummet"
+and a hardcoded external logo image URL baked in with no way to
+change them, and the homepage's section list was fixed — no way to
+add more without editing code.
+
+- **New site settings** (same `lummet_site_settings` key/value table,
+  no migration needed): `site_name`, `logo_url`, `accent_color`,
+  `accent_color_secondary`. Set from **Lummet Site → Homepage
+  settings**. The header/footer logo now renders the uploaded image
+  (or falls back to the default dot mark) and links home instead of
+  to the image file itself — a real bug in the original hardcoded
+  markup, fixed as part of this. Accent colors are validated against
+  a narrow allow-list (hex / `rgb()`/`rgba()` / bare CSS keyword)
+  before being interpolated into a `<style>` block, so an admin
+  can't inject arbitrary CSS/HTML through the color fields.
+- **`migrations/0004_lummet_homepage_sections.sql`** — a new
+  `lummet_homepage_sections` table and matching **Lummet Site →
+  Homepage sections** screen. Each section has a title, subtitle,
+  rich-text body, optional image, a `layout` (`text_only` /
+  `image_left` / `image_right`), an optional CTA button, and a sort
+  order. Published sections render on the homepage after the
+  built-in Updates/Partners sections, in `sort_order`. A standalone
+  page's own body (`/cms/pages`) already supports arbitrary rich
+  text/HTML for its own layout, so this is specifically for
+  the homepage's fixed section list.
+- Verified with 24 additional smoke-test assertions: forced
+  password-change lockout and its failure modes (wrong current
+  password, mismatched confirmation, too-short new password), custom
+  branding actually appearing on the rendered homepage and `/p/:slug`
+  pages, the CSS-injection guard on the color fields, and draft vs.
+  published visibility for homepage sections.
+
 ## Deployment
 
 See **DEPLOYMENT.md** in this same folder for the full, step-by-step

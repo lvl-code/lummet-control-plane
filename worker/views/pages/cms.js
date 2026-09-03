@@ -200,6 +200,10 @@ export async function submitCmsDelete(env, resourceKey, id) {
 // -----------------------------------------------------
 
 const SETTING_LABELS = {
+  site_name: "Site name",
+  logo_url: "Logo image URL",
+  accent_color: "Primary accent color",
+  accent_color_secondary: "Secondary accent color",
   hero_eyebrow: "Hero eyebrow text",
   hero_title: "Hero title",
   hero_subtitle: "Hero subtitle",
@@ -211,14 +215,22 @@ const SETTING_LABELS = {
   footer_text: "Footer text"
 };
 
+const SETTING_HINTS = {
+  site_name: 'Shown next to the logo, e.g. "Lummet". Leave blank to keep "Lummet".',
+  logo_url: "Shown in the header instead of the dot icon. Leave blank to use the default mark.",
+  accent_color: "Hex color, e.g. #6d5bf6. Leave blank for the default purple.",
+  accent_color_secondary: "Hex color used for gradients alongside the primary accent."
+};
+
 export async function renderSiteSettingsPage(env, admin, flash) {
   const activeKey = "cms-site-settings";
   const settings = await getSiteSettings(env);
 
   const fieldsHtml = SITE_SETTING_KEYS.map((key) => {
     const isLong = key === "hero_subtitle" || key === "footer_text";
+    const hint = SETTING_HINTS[key];
     return `<div class="form-group">
-      <label>${escapeHtml(SETTING_LABELS[key] || key)}</label>
+      <label>${escapeHtml(SETTING_LABELS[key] || key)}${hint ? ` <span style="color:var(--text-dim);font-weight:400;">— ${escapeHtml(hint)}</span>` : ""}</label>
       ${isLong
         ? `<textarea name="${key}" rows="3">${escapeHtml(settings[key] || "")}</textarea>`
         : `<input type="text" name="${key}" value="${escapeHtml(settings[key] || "")}" />`}
@@ -226,16 +238,38 @@ export async function renderSiteSettingsPage(env, admin, flash) {
   }).join("");
 
   const body = `
-    <h1>Homepage settings</h1>
-    <p class="subtitle">Lummet Site · Site settings — edits the copy shown on lummet.com's public homepage. Leave a field blank to fall back to the built-in default.</p>
+    <h1>Homepage &amp; site settings</h1>
+    <p class="subtitle">Lummet Site · Site settings — edits the branding and copy shown on lummet.com's public site. Leave a field blank to fall back to the built-in default.</p>
     ${flashHtml(flash)}
     <form method="POST" action="/cms/settings" class="card">
-      ${fieldsHtml}
+      <h3 style="margin-top:0;">Branding</h3>
+      ${["site_name", "logo_url", "accent_color", "accent_color_secondary"].map((key) => {
+        const hint = SETTING_HINTS[key];
+        return `<div class="form-group">
+          <label>${escapeHtml(SETTING_LABELS[key] || key)}${hint ? ` <span style="color:var(--text-dim);font-weight:400;">— ${escapeHtml(hint)}</span>` : ""}</label>
+          <input type="text" name="${key}" value="${escapeHtml(settings[key] || "")}" />
+        </div>`;
+      }).join("")}
+      <h3>Homepage copy</h3>
+      ${SITE_SETTING_KEYS.filter((k) => !["site_name", "logo_url", "accent_color", "accent_color_secondary"].includes(k))
+        .map((key) => {
+          const isLong = key === "hero_subtitle" || key === "footer_text";
+          return `<div class="form-group">
+            <label>${escapeHtml(SETTING_LABELS[key] || key)}</label>
+            ${isLong
+              ? `<textarea name="${key}" rows="3">${escapeHtml(settings[key] || "")}</textarea>`
+              : `<input type="text" name="${key}" value="${escapeHtml(settings[key] || "")}" />`}
+          </div>`;
+        }).join("")}
       <div style="display:flex;gap:8px;margin-top:16px;">
         <button type="submit" class="btn btn-primary">Save</button>
         <a class="btn btn-secondary" href="/" target="_blank" rel="noopener">Preview homepage</a>
       </div>
-    </form>`;
+    </form>
+    <div class="card">
+      <h3 style="margin-top:0;">Want more homepage sections?</h3>
+      <p style="font-size:13px;color:var(--text-dim);">Add, reorder, and publish extra homepage blocks (a text block, an image-and-text block, or a card row) from <a href="/cms/homepage_sections">Homepage sections</a> — no code changes needed. Each standalone page's own body content (from <a href="/cms/pages">Pages</a>) already supports full rich text/HTML for however that page needs to be laid out.</p>
+    </div>`;
 
   return renderShell({ title: "Homepage settings", activeKey, admin, bodyHtml: body, env });
 }

@@ -122,6 +122,7 @@ import {
   submitSetTenantAccess,
   submitSetPermission as submitSetAdminPermission
 } from "./views/pages/admins.js";
+import { renderChangePasswordPage, submitChangePassword } from "./views/pages/account.js";
 
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -379,6 +380,14 @@ export default {
 
       const ipHash = await hashIP(request);
       const adminIsSuper = isSuperAdmin(admin);
+
+      // Any admin signed in with a temporary password (set at account
+      // creation — see admins.js) is redirected to /account/password
+      // for every HTML route until they set a real one. API routes are
+      // left alone so nothing silently breaks mid-session.
+      if (admin.must_change_password === 1 && !isApiRoute && path !== "/account/password") {
+        return redirect("/account/password");
+      }
 
       // ---------------------------------------------
       // RBAC enforcement helpers (Phase 10)
@@ -918,6 +927,29 @@ export default {
         return html(await renderDashboardHome(env, admin));
       }
 
+      if (path === "/account/password") {
+        if (method === "GET") {
+          return html(await renderChangePasswordPage(env, admin, null));
+        }
+
+        if (method === "POST") {
+          const form = await parseForm(request);
+          const result = await submitChangePassword(env, admin, form);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: null, endpoint: path, method,
+            resource: "lummet_admin", resourceId: admin.id, action: "change_password",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.error, requestId, ipHash
+          });
+
+          if (!result.ok) {
+            return html(await renderChangePasswordPage(env, admin, describePasswordError(result.error)));
+          }
+          return redirect("/");
+        }
+      }
+
       if (method === "GET" && path === "/tenants") {
         const guard = requireSuperAdmin();
         if (guard) return guard;
@@ -1368,9 +1400,22 @@ function describeAuthError(code) {
     too_many_attempts: "Too many attempts. Try again in 15 minutes.",
     email_and_password_required: "Email and password are required.",
     already_bootstrapped: "An admin account already exists — please log in instead.",
-    invalid_email_or_password: "Please provide a valid email and a password of at least 12 characters."
+    invalid_email_or_password: "Please provide a valid email and a password of at least 12 characters.",
+    email_required: "Email is required.",
+    invalid_role: "Please choose a valid role.",
+    email_already_registered: "That email is already registered."
   };
   return map[code] || "Something went wrong. Please try again.";
+}
+
+function describePasswordError(code) {
+  const map = {
+    passwords_do_not_match: "The new password and confirmation don't match.",
+    password_too_short: "New password must be at least 12 characters.",
+    invalid_current_password: "Current password is incorrect.",
+    not_found: "Account not found."
+  };
+  return map[code] || "Could not change password. Please try again.";
 }
 
 function describeRegistryError(code) {
