@@ -123,6 +123,18 @@ import {
   submitSetPermission as submitSetAdminPermission
 } from "./views/pages/admins.js";
 import { renderChangePasswordPage, submitChangePassword } from "./views/pages/account.js";
+import {
+  renderCountryPagesList,
+  renderCountryPageForm,
+  renderCategoryCountriesList,
+  renderCategoryCountryForm,
+  submitCreateSeoPage,
+  submitUpdateSeoPage,
+  submitDeleteSeoPage,
+  proxySearchCountries,
+  proxyEligibleCasinos,
+  submitGenerateCategoryCountryDraft
+} from "./views/pages/seo-pages.js";
 
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -824,6 +836,90 @@ export default {
         }
 
         // ---------------------------------------------
+        // SEO landing pages (country pages / category×country pages)
+        // ---------------------------------------------
+
+        if (method === "GET" && path === "/api/seo-pages/countries-search") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "seo_pages", "read"));
+          if (guard) return guard;
+          const q = url.searchParams.get("q") || "";
+          const result = await proxySearchCountries(env, admin, q);
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data || [] });
+        }
+
+        if (method === "GET" && path === "/api/seo-pages/eligible-casinos") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "seo_pages", "read"));
+          if (guard) return guard;
+          const countryCode = url.searchParams.get("country_code");
+          const categorySlug = url.searchParams.get("category_slug");
+          if (!countryCode) return json({ success: false, error: "country_code_required" }, 422);
+          const result = await proxyEligibleCasinos(env, admin, countryCode, categorySlug);
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data || [] });
+        }
+
+        if (method === "POST" && path === "/api/seo-pages/generate-draft") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "seo_pages", "create"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitGenerateCategoryCountryDraft(env, admin, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "seo_pages", action: "generate_draft",
+            success: result.ok, statusCode: result.ok ? 201 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data }, 201);
+        }
+
+        if (method === "POST" && path === "/api/seo-pages") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "seo_pages", "create"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitCreateSeoPage(env, admin, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "seo_pages", action: "create",
+            success: result.ok, statusCode: result.ok ? 201 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data }, 201);
+        }
+
+        const seoPageParams = matchPath("/api/seo-pages/:id", path);
+        if (seoPageParams && (method === "PUT" || method === "DELETE")) {
+          const guard =
+            (await requireActiveTenantAccess()) ||
+            (await requirePermission("tenant", "seo_pages", method === "PUT" ? "update" : "delete"));
+          if (guard) return guard;
+          const payload = method === "PUT" ? await request.json().catch(() => ({})) : null;
+          const result =
+            method === "PUT"
+              ? await submitUpdateSeoPage(env, admin, seoPageParams.id, payload)
+              : await submitDeleteSeoPage(env, admin, seoPageParams.id);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "seo_pages", resourceId: seoPageParams.id, action: method === "PUT" ? "update" : "delete",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        // ---------------------------------------------
         // Lummet admin management API (Phase 10, super-admin only)
         // ---------------------------------------------
 
@@ -1281,6 +1377,40 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
       const guard = await checkResourcePermission("reviews", "read", false);
       if (guard) return guard;
       return html(await renderReviewBlocksPage(env, admin, reviewBlocksParams.slug));
+    }
+
+    if (method === "GET" && path === "/content/country-pages") {
+      const guard = await checkResourcePermission("seo_pages", "read", false);
+      if (guard) return guard;
+      return html(await renderCountryPagesList(env, admin));
+    }
+    if (method === "GET" && path === "/content/country-pages/new") {
+      const guard = await checkResourcePermission("seo_pages", "create", false);
+      if (guard) return guard;
+      return html(await renderCountryPageForm(env, admin, null));
+    }
+    const countryPageEditParams = matchPath("/content/country-pages/:id/edit", path);
+    if (method === "GET" && countryPageEditParams) {
+      const guard = await checkResourcePermission("seo_pages", "update", false);
+      if (guard) return guard;
+      return html(await renderCountryPageForm(env, admin, countryPageEditParams.id));
+    }
+
+    if (method === "GET" && path === "/content/category-countries") {
+      const guard = await checkResourcePermission("seo_pages", "read", false);
+      if (guard) return guard;
+      return html(await renderCategoryCountriesList(env, admin));
+    }
+    if (method === "GET" && path === "/content/category-countries/new") {
+      const guard = await checkResourcePermission("seo_pages", "create", false);
+      if (guard) return guard;
+      return html(await renderCategoryCountryForm(env, admin, null));
+    }
+    const categoryCountryEditParams = matchPath("/content/category-countries/:id/edit", path);
+    if (method === "GET" && categoryCountryEditParams) {
+      const guard = await checkResourcePermission("seo_pages", "update", false);
+      if (guard) return guard;
+      return html(await renderCategoryCountryForm(env, admin, categoryCountryEditParams.id));
     }
   }
 

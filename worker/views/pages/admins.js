@@ -178,7 +178,7 @@ export async function renderAdminDetail(env, admin, targetId, flash) {
     </div>`;
   }
 
-  const tenantResourceKeys = Object.keys(RESOURCES).concat(["settings"]);
+  const tenantResourceKeys = Object.keys(RESOURCES).concat(["settings", "seo_pages"]);
   const cmsResourceKeys = Object.keys(CMS_RESOURCES).concat(["site_settings"]);
 
   const body = `

@@ -40,7 +40,9 @@ const NAV = [
       { label: "Updates", href: "/content/updates", key: "content-updates", area: "tenant", resource: "updates" },
       { label: "Pages", href: "/content/pages", key: "content-pages", area: "tenant", resource: "pages" },
       { label: "Categories", href: "/content/categories", key: "content-categories", area: "tenant", resource: "categories" },
-      { label: "Countries", href: "/content/countries", key: "content-countries", area: "tenant", resource: "countries" }
+      { label: "Countries", href: "/content/countries", key: "content-countries", area: "tenant", resource: "countries" },
+      { label: "Country Pages", href: "/content/country-pages", key: "content-country-pages", area: "tenant", resource: "seo_pages" },
+      { label: "Category Countries", href: "/content/category-countries", key: "content-category-countries", area: "tenant", resource: "seo_pages" }
     ]
   },
   {
