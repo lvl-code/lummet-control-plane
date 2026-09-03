@@ -186,6 +186,11 @@ export async function authenticateAdmin(env, email, password, ipHash) {
     return { ok: false, status: 401, error: "invalid_credentials", email, adminId: admin.id };
   }
 
+  if (admin.status === "disabled") {
+    await logFailedAttempt(env, ipHash, "login");
+    return { ok: false, status: 403, error: "account_disabled", email, adminId: admin.id };
+  }
+
   const sessionId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
 
@@ -252,10 +257,17 @@ export async function getCurrentAdmin(request, env) {
   }
 
   const admin = await env.LUMMET_DB.prepare(
-    `SELECT id, email, role FROM lummet_admins WHERE id = ?`
+    `SELECT id, email, role, status, must_change_password FROM lummet_admins WHERE id = ?`
   ).bind(session.admin_id).first();
 
-  if (!admin) return null;
+  if (!admin || admin.status === "disabled") {
+    // A disabled admin's existing sessions are cut immediately, not
+    // just blocked at the next login.
+    await env.LUMMET_DB.prepare(`DELETE FROM lummet_sessions WHERE id = ?`)
+      .bind(sessionId)
+      .run();
+    return null;
+  }
 
   return { ...admin, sessionId, activeTenantId: session.active_tenant_id || null };
 }
@@ -264,4 +276,138 @@ export async function setActiveTenant(env, sessionId, tenantId) {
   await env.LUMMET_DB.prepare(
     `UPDATE lummet_sessions SET active_tenant_id = ? WHERE id = ?`
   ).bind(tenantId, sessionId).run();
+}
+
+// -----------------------------------------------------
+// Lummet admin management (Phase 10) — creating additional
+// staff accounts, granting/revoking super admin, enabling/
+// disabling accounts, and self-service password changes.
+// Only ever called after a route handler has already
+// confirmed the caller is a super admin (see rbac.js) —
+// this module does not re-check that itself, matching how
+// registry.js/client.js trust their own callers.
+// -----------------------------------------------------
+
+function randomTempPassword() {
+  // 20 random bytes, base64url-ish, trimmed to a clean length —
+  // long enough to comfortably clear the 12-char minimum below
+  // and never re-typed by a human (shown once, then changed).
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  return btoa(String.fromCharCode(...bytes)).replace(/[^a-zA-Z0-9]/g, "").slice(0, 20);
+}
+
+export async function listAdmins(env) {
+  const result = await env.LUMMET_DB.prepare(
+    `SELECT id, email, role, status, must_change_password, created_at FROM lummet_admins ORDER BY created_at`
+  ).all();
+  return result.results || [];
+}
+
+export async function getAdminById(env, id) {
+  return env.LUMMET_DB.prepare(
+    `SELECT id, email, role, status, must_change_password, created_at FROM lummet_admins WHERE id = ?`
+  ).bind(id).first();
+}
+
+/**
+ * Creates a new Lummet staff account with a random temporary
+ * password, returned once (never persisted in plaintext, never
+ * logged) — the same "shown exactly once" pattern this repo already
+ * uses for tenant API credentials. The new admin must change it on
+ * first login.
+ */
+export async function createAdmin(env, { email, role, createdBy }) {
+  email = (email || "").trim();
+  if (!email) return { ok: false, status: 422, error: "email_required" };
+  if (role !== "super_admin" && role !== "staff") {
+    return { ok: false, status: 422, error: "invalid_role" };
+  }
+
+  const existing = await env.LUMMET_DB.prepare(
+    `SELECT id FROM lummet_admins WHERE email = ?`
+  ).bind(email).first();
+  if (existing) return { ok: false, status: 409, error: "email_already_registered" };
+
+  const tempPassword = randomTempPassword();
+  const passwordHash = await hashPassword(tempPassword);
+
+  const inserted = await env.LUMMET_DB.prepare(
+    `INSERT INTO lummet_admins (email, password_hash, role, status, created_by, must_change_password)
+     VALUES (?, ?, ?, 'active', ?, 1) RETURNING id`
+  ).bind(email, passwordHash, role, createdBy || null).first();
+
+  return { ok: true, adminId: inserted?.id ?? null, email, tempPassword };
+}
+
+export async function setAdminRole(env, adminId, role) {
+  if (role !== "super_admin" && role !== "staff") {
+    return { ok: false, status: 422, error: "invalid_role" };
+  }
+  await env.LUMMET_DB.prepare(`UPDATE lummet_admins SET role = ? WHERE id = ?`)
+    .bind(role, adminId)
+    .run();
+  return { ok: true };
+}
+
+export async function setAdminStatus(env, adminId, status) {
+  if (status !== "active" && status !== "disabled") {
+    return { ok: false, status: 422, error: "invalid_status" };
+  }
+  await env.LUMMET_DB.prepare(`UPDATE lummet_admins SET status = ? WHERE id = ?`)
+    .bind(status, adminId)
+    .run();
+  if (status === "disabled") {
+    await env.LUMMET_DB.prepare(`DELETE FROM lummet_sessions WHERE admin_id = ?`)
+      .bind(adminId)
+      .run();
+  }
+  return { ok: true };
+}
+
+export async function deleteAdmin(env, adminId) {
+  await env.LUMMET_DB.prepare(`DELETE FROM lummet_admins WHERE id = ?`).bind(adminId).run();
+  return { ok: true };
+}
+
+export async function countSuperAdmins(env) {
+  const row = await env.LUMMET_DB.prepare(
+    `SELECT COUNT(*) c FROM lummet_admins WHERE role IN ('super_admin', 'master_admin') AND status = 'active'`
+  ).first();
+  return row?.c || 0;
+}
+
+export async function changeOwnPassword(env, adminId, currentPassword, newPassword) {
+  if (!newPassword || newPassword.length < 12) {
+    return { ok: false, status: 422, error: "password_too_short" };
+  }
+  const admin = await env.LUMMET_DB.prepare(`SELECT password_hash FROM lummet_admins WHERE id = ?`)
+    .bind(adminId)
+    .first();
+  if (!admin) return { ok: false, status: 404, error: "not_found" };
+
+  const valid = await verifyPassword(currentPassword || "", admin.password_hash);
+  if (!valid) return { ok: false, status: 401, error: "invalid_current_password" };
+
+  const newHash = await hashPassword(newPassword);
+  await env.LUMMET_DB.prepare(
+    `UPDATE lummet_admins SET password_hash = ?, must_change_password = 0 WHERE id = ?`
+  ).bind(newHash, adminId).run();
+
+  return { ok: true };
+}
+
+/**
+ * Used only right after createAdmin(), when the caller already knows
+ * the temp password out of band and just needs to set a real one —
+ * no "current password" check, since there isn't a real one yet.
+ */
+export async function setPasswordDirect(env, adminId, newPassword) {
+  if (!newPassword || newPassword.length < 12) {
+    return { ok: false, status: 422, error: "password_too_short" };
+  }
+  const newHash = await hashPassword(newPassword);
+  await env.LUMMET_DB.prepare(
+    `UPDATE lummet_admins SET password_hash = ?, must_change_password = 0 WHERE id = ?`
+  ).bind(newHash, adminId).run();
+  return { ok: true };
 }

@@ -1,5 +1,6 @@
 import { escapeHtml } from "../layout.js";
 import { listPublicBrands } from "../../public-brands.js";
+import { getSiteSettings, listPublished, listActiveAdsForPlacement } from "../../cms.js";
 
 const SITE_TITLE = "Lummet — Centralized Technology & AI Platform for Digital Brands";
 const SITE_DESCRIPTION =
@@ -236,6 +237,88 @@ function renderBrandCards(brands) {
     .join("");
 }
 
+// Fallback copy used for any homepage setting the admin hasn't
+// filled in yet from /cms/settings — so the page never looks
+// broken/empty on a fresh deployment, matching the original
+// hardcoded copy this replaces.
+const HERO_DEFAULTS = {
+  hero_eyebrow: "Lummet Platform",
+  hero_title: "One Platform. Multiple Brands. Centralized Control.",
+  hero_subtitle:
+    "Lummet is the centralized technology and AI platform built to operate, manage and scale multiple digital properties from a single control plane.",
+  hero_cta_primary_label: "Get a Demo",
+  hero_cta_primary_href: "#demo",
+  hero_cta_secondary_label: "Explore Our Brands",
+  hero_cta_secondary_href: "#brands",
+  footer_text: "Centralized technology and AI infrastructure for scalable digital brands."
+};
+
+function heroCopy(settings) {
+  const out = {};
+  for (const key of Object.keys(HERO_DEFAULTS)) {
+    out[key] = settings[key] && String(settings[key]).trim() ? settings[key] : HERO_DEFAULTS[key];
+  }
+  return out;
+}
+
+function renderAdBanner(ad) {
+  if (!ad) return "";
+  const img = `<img src="${escapeHtml(ad.image_url || "")}" alt="${escapeHtml(ad.alt_text || ad.name || "")}" style="width:100%;border-radius:14px;display:block;" />`;
+  return `
+    <section class="tight">
+      <div class="wrap">
+        ${ad.link_url
+          ? `<a href="${escapeHtml(ad.link_url)}" target="_blank" rel="noopener sponsored">${img}</a>`
+          : img}
+      </div>
+    </section>`;
+}
+
+function renderUpdatesSection(updates) {
+  if (!updates.length) return "";
+  const cards = updates
+    .map(
+      (u) => `
+      <div class="card">
+        <div class="step-no">${escapeHtml((u.published_at || u.created_at || "").slice(0, 10))}</div>
+        <h3>${escapeHtml(u.title)}</h3>
+        <p>${escapeHtml(u.excerpt || "")}</p>
+      </div>`
+    )
+    .join("");
+  return `
+    <section id="updates" class="section-soft">
+      <div class="wrap">
+        <span class="eyebrow">What's New</span>
+        <h2>Latest Updates</h2>
+        <div class="grid-3">${cards}</div>
+      </div>
+    </section>`;
+}
+
+function renderPartnersSection(partners) {
+  if (!partners.length) return "";
+  const cards = partners
+    .map(
+      (p) => `
+      <a class="brand-card" href="${escapeHtml(p.website_url || "#")}" target="_blank" rel="noopener noreferrer">
+        <div class="brand-mark">${brandInitial(p.name)}</div>
+        <div class="brand-name">${escapeHtml(p.name)}</div>
+        <div class="brand-category">${escapeHtml(p.partner_type || "")}</div>
+        <p class="brand-desc">${escapeHtml(p.description || "")}</p>
+      </a>`
+    )
+    .join("");
+  return `
+    <section id="partners">
+      <div class="wrap">
+        <span class="eyebrow">Partners</span>
+        <h2>Our Partners</h2>
+        <div class="brand-grid">${cards}</div>
+      </div>
+    </section>`;
+}
+
 function contactBlock(contactEmail) {
   if (contactEmail) {
     return `
@@ -300,9 +383,76 @@ export function renderPublicStaticPage({ title, heading, bodyText }) {
 </html>`;
 }
 
-export function renderPublicHomepage({ contactEmail } = {}) {
+/**
+ * Renders a Lummet-managed standalone page (lummet_pages, created
+ * from /cms/pages in the dashboard) at lummet.com/p/:slug. Returns
+ * null if there's no published page at that slug, so index.js can
+ * fall through to a normal 404.
+ */
+export async function renderPublicCmsPage(env, slug) {
+  const { getPublishedBySlug } = await import("../../cms.js");
+  const page = await getPublishedBySlug(env, "pages", slug);
+  if (!page) return null;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(page.seo_title || page.title)} · Lummet</title>
+  ${page.seo_description ? `<meta name="description" content="${escapeHtml(page.seo_description)}" />` : ""}
+  <style>${STYLES}</style>
+</head>
+<body>
+  <header class="site">
+    <div class="nav-inner">
+      <a class="logo" href="https://level.casino/media/lummet/1788359639229-55a3643f6bba8b7a.png"><span class="dot"></span> Lummet</a>
+      <a class="btn btn-secondary" href="/">Back to Lummet</a>
+    </div>
+  </header>
+  <main>
+    <section class="tight">
+      <div class="wrap" style="max-width:720px;">
+        <h1>${escapeHtml(page.title)}</h1>
+        <div class="lede">${page.content || ""}</div>
+      </div>
+    </section>
+  </main>
+  <footer class="site">
+    <div class="wrap footer-bottom">
+      <span>© ${new Date().getFullYear()} Lummet. All rights reserved.</span>
+    </div>
+  </footer>
+</body>
+</html>`;
+}
+
+export async function renderPublicHomepage(env, { contactEmail } = {}) {
   const brands = listPublicBrands();
   const canonicalUrl = "https://lummet.com/";
+
+  // Everything below is manageable from the Lummet dashboard
+  // (Lummet Site nav section) instead of being hardcoded here.
+  // Defensive fallbacks keep the page rendering even before the
+  // Phase 9 migration has run or before any content is added.
+  let settings = {};
+  let updates = [];
+  let partners = [];
+  let bannerAd = null;
+  try {
+    [settings, updates, partners, bannerAd] = await Promise.all([
+      getSiteSettings(env),
+      listPublished(env, "updates", 3),
+      listPublished(env, "partners", 8),
+      listActiveAdsForPlacement(env, "homepage_banner").then((ads) => ads[0] || null)
+    ]);
+  } catch {
+    // First deploy before migration 0002 has run, or a transient D1
+    // error — the homepage still renders with built-in defaults.
+  }
+  const hero = heroCopy(settings);
+  const effectiveContactEmail = (settings.contact_email && settings.contact_email.trim()) || contactEmail;
+  const footerText = (settings.footer_text && settings.footer_text.trim()) || HERO_DEFAULTS.footer_text;
 
   const structuredData = {
     "@context": "https://schema.org",
@@ -375,17 +525,19 @@ export function renderPublicHomepage({ contactEmail } = {}) {
     <section class="hero">
       <div class="wrap hero-grid">
         <div>
-          <span class="eyebrow">Lummet Platform</span>
-          <h1>One Platform. Multiple Brands. Centralized Control.</h1>
-          <p class="lede">Lummet is the centralized technology and AI platform built to operate, manage and scale multiple digital properties from a single control plane.</p>
+          <span class="eyebrow">${escapeHtml(hero.hero_eyebrow)}</span>
+          <h1>${escapeHtml(hero.hero_title)}</h1>
+          <p class="lede">${escapeHtml(hero.hero_subtitle)}</p>
           <div class="hero-ctas">
-            <a class="btn btn-primary btn-lg" href="#demo">Get a Demo</a>
-            <a class="btn btn-secondary btn-lg" href="#brands">Explore Our Brands</a>
+            <a class="btn btn-primary btn-lg" href="${escapeHtml(hero.hero_cta_primary_href)}">${escapeHtml(hero.hero_cta_primary_label)}</a>
+            <a class="btn btn-secondary btn-lg" href="${escapeHtml(hero.hero_cta_secondary_href)}">${escapeHtml(hero.hero_cta_secondary_label)}</a>
           </div>
         </div>
         ${flowVisual()}
       </div>
     </section>
+
+    ${renderAdBanner(bannerAd)}
 
     <!-- 2. What Is Lummet -->
     <section id="platform">
@@ -462,6 +614,9 @@ export function renderPublicHomepage({ contactEmail } = {}) {
       </div>
     </section>
 
+    ${renderUpdatesSection(updates)}
+    ${renderPartnersSection(partners)}
+
     <!-- 6. Why Lummet -->
     <section>
       <div class="wrap why-grid">
@@ -537,7 +692,7 @@ export function renderPublicHomepage({ contactEmail } = {}) {
         <div class="contact-card">
           <span class="eyebrow">Let's Talk</span>
           <h2>Get in Touch</h2>
-          ${contactBlock(contactEmail)}
+          ${contactBlock(effectiveContactEmail)}
         </div>
       </div>
     </section>
@@ -549,7 +704,7 @@ export function renderPublicHomepage({ contactEmail } = {}) {
       <div class="footer-grid">
         <div>
           <a class="logo" href="https://level.casino/media/lummet/1788359639229-55a3643f6bba8b7a.png"><span class="dot"></span> Lummet</a>
-          <p style="max-width:280px;margin-top:10px;">Centralized technology and AI infrastructure for scalable digital brands.</p>
+          <p style="max-width:280px;margin-top:10px;">${escapeHtml(footerText)}</p>
         </div>
         <nav class="footer-nav">
           <a href="#platform">Platform</a>

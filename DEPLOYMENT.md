@@ -146,11 +146,25 @@ wrangler d1 create lummet-control-plane-db
 Copy the `database_id` from the output into `wrangler.jsonc`,
 replacing `REPLACE_WITH_ACTUAL_D1_DATABASE_ID`.
 
-### 2.3 Run the migration
+### 2.3 Run the migrations
 
 ```
 wrangler d1 execute lummet-control-plane-db --file=migrations/0001_control_plane.sql --remote
+wrangler d1 execute lummet-control-plane-db --file=migrations/0002_lummet_cms.sql --remote
+wrangler d1 execute lummet-control-plane-db --file=migrations/0003_lummet_admin_rbac.sql --remote
 ```
+
+`0002` adds Lummet's own CMS tables (pages, authors, brands,
+partners, updates, publications, advertisements, homepage settings).
+`0003` adds the staff-account RBAC tables. Both are additive — safe
+to run on an existing deployment that only has `0001` applied, and
+the homepage/nav code falls back gracefully if `0002`/`0003` haven't
+run yet (new nav sections/CMS just won't have anywhere to write, and
+`renderPublicHomepage` catches the failure and falls back to its
+built-in defaults). Run them before granting any staff account
+access, though — until `0003` is applied, every non-bootstrap admin
+account creation will fail since `lummet_admins.status` doesn't exist
+yet.
 
 ### 2.4 Generate and set the credential encryption key
 
@@ -195,7 +209,28 @@ form instead of a login form, and logs you straight in afterward.
 (Or via the API: `POST /api/auth/bootstrap` with
 `{"email": "...", "password": "... 12+ chars ..."}`.)
 
-### 2.8 Register a tenant
+The bootstrapped account is always a super admin — it can grant
+itself and anyone else access to anything. Add every other Lummet
+staff account from **Platform → Admins → New admin** (super-admin
+only): pick "Staff" as the role, and a temporary password is shown
+exactly once — copy it before leaving the page, then grant that
+staff account whichever tenants and Content/System/CMS resources
+they need from their detail page (`/platform/admins/:id`). A fresh
+staff account has zero access until you grant it.
+
+### 2.8 Set up lummet.com's own homepage/content
+
+Optional, any time after 2.7: **Lummet Site → Homepage settings**
+lets you override the hero title/subtitle/CTAs, footer text, and
+contact email shown on the public homepage — everything left blank
+falls back to sensible built-in copy. **Lummet Site → Pages/Authors/
+Brand profiles/Partners/Updates/Publications/Advertisements** manage
+the rest of lummet.com's own content (separate from any tenant's
+content). Published Updates and Partners show up on the homepage
+automatically; a published Page is reachable at
+`lummet.com/p/<slug>`.
+
+### 2.9 Register a tenant
 
 From the dashboard: **Tenants → Add Tenant**, enter the tenant's
 display name and hostname (e.g. `freewin.xyz`).
@@ -216,11 +251,14 @@ After setting those and redeploying the tenant Worker, go back to
 the tenant's page in the dashboard and click **Test connection**.
 You should see `Online` and a populated capability list.
 
-### 2.9 Repeat for each additional tenant
+### 2.10 Repeat for each additional tenant
 
-Part 1 (tenant side) + step 2.8 (register + set secrets), once per
+Part 1 (tenant side) + step 2.9 (register + set secrets), once per
 tenant. Each tenant gets its own credential — rotating or revoking
-one tenant's credential never affects another.
+one tenant's credential never affects another. Remember: a staff
+admin needs to be explicitly granted access to a new tenant before
+they can see or manage it (Platform → Admins → that admin →
+Tenant access) — a super admin always has access automatically.
 
 ---
 

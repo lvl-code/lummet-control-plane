@@ -246,6 +246,109 @@ fix, click **Rotate credential** on its detail page (once
 `CREDENTIAL_KEK` is confirmed set via `wrangler secret list`) — that
 now safely issues a fresh, active credential for it.
 
+### Phase 9 — Lummet's own CMS (homepage no longer hardcoded)
+
+Everything on lummet.com itself — the homepage's copy, and pages,
+authors, brand profiles, partners, updates, publications, and
+advertisements — was previously either hardcoded HTML in `home.js`
+or simply didn't exist as a manageable resource. Phase 9 adds a real
+CMS for Lummet's own site, entirely separate from any tenant's
+content:
+
+- **New tables** (`migrations/0002_lummet_cms.sql`): `lummet_pages`,
+  `lummet_authors`, `lummet_brands`, `lummet_partners`,
+  `lummet_updates`, `lummet_publications`, `lummet_advertisements`,
+  and `lummet_site_settings` (key/value, same shape as a tenant's own
+  `settings` table).
+- **`worker/cms-resources.js`** — the field/column contract for each
+  resource (mirrors `resources.js`'s shape, but every one of these
+  reads/writes this control plane's own D1 directly — there's no
+  tenant HTTP call involved, unlike `resources.js`).
+- **`worker/cms.js`** — the D1 CRUD layer: list/get/create/update/
+  delete per resource, plus `getSiteSettings`/`setSiteSettings` for
+  the homepage's editable copy, and `listPublished`/
+  `getPublishedBySlug`/`listActiveAdsForPlacement` for what the
+  public site actually reads (always filtered to
+  published/active — a draft is never publicly reachable).
+- **`worker/views/pages/cms.js`** — generic list/create/edit screens
+  at `/cms/:resource`, reusing the same rich-text editor as the
+  tenant CRUD screens (`renderRichTextField` from `crud.js`), plus a
+  dedicated `/cms/settings` screen for the homepage's hero
+  copy/CTAs/footer/contact email.
+- **`home.js`'s homepage is now dynamic**: hero eyebrow/title/
+  subtitle/CTA labels+links, footer text, and contact email all pull
+  from `lummet_site_settings`, falling back to the original hardcoded
+  copy if a field hasn't been set yet (so a fresh deploy, or one
+  before migration 0002 has run, never renders broken/empty). Added
+  a live **Updates** section and **Partners** section pulling
+  published rows, and an ad-banner slot for the `homepage_banner`
+  placement.
+- **`/p/:slug`** — a new public route that renders a published
+  `lummet_pages` row (e.g. an About page created from
+  `/cms/pages/new`). Unpublished/draft pages 404.
+- Nav gained a **"Lummet Site"** section: Pages, Authors, Brand
+  profiles, Partners, Updates, Publications, Advertisements, and
+  Homepage settings.
+
+### Phase 10 — Lummet staff accounts & permissions
+
+Before this phase, `lummet_admins` had exactly one usable role
+(`master_admin`, set once at bootstrap) — there was no way to create
+a second Lummet staff account at all, let alone scope what they could
+do. Phase 10 adds real role-based access control for the control
+plane itself:
+
+- **New tables** (`migrations/0003_lummet_admin_rbac.sql`):
+  `lummet_admins` gains `status` (active/disabled) and
+  `must_change_password`; `lummet_admin_tenant_access` (which
+  tenants a staff admin may switch to/act on at all);
+  `lummet_admin_permissions` (per-admin resource/action grants,
+  scoped by `area` — `tenant` for a tenant's own Content/System
+  resources, or `cms` for Lummet's own CMS resources from Phase 9).
+- **A super admin** (`role = "super_admin"`, or the legacy
+  `"master_admin"` value from before this migration) bypasses every
+  check — same pattern as a tenant's own `admin` role bypassing its
+  permissions table. **Everyone else starts with zero access** —
+  no tenants, no resources — until a super admin explicitly grants
+  it. This is enforced by `worker/rbac.js` and checked at the top of
+  every route handler that touches a tenant's content, Lummet's CMS,
+  or the control plane's own registry/credentials — **not just by
+  hiding the nav link**, since hiding a link never actually stops a
+  direct request.
+- **`/platform/admins`** (super-admin-only) — list staff accounts,
+  create a new one (a random temporary password is generated and
+  shown exactly once — there's no email-sending set up — and the new
+  admin must change it on first login), toggle role/status, and a
+  detail screen (`/platform/admins/:id`) with a tenant-access
+  checklist and a full permission matrix (create/read/update/delete
+  per resource, for both the `tenant` and `cms` areas).
+- **Guardrails**: an admin can't change their own role, can't disable
+  or delete themselves, and the last remaining super admin can't be
+  demoted or deleted — there's always at least one account that can
+  grant access to everyone else.
+- **A disabled admin's existing sessions are cut immediately** (not
+  just blocked at their next login attempt) — `getCurrentAdmin`
+  deletes the session row the moment it sees `status = 'disabled'`.
+- Nav now filters per-admin: `layout.js` loads the acting admin's
+  full permission map once per request and only renders a link if
+  they hold a `read` grant on that resource (super admins, and the
+  "Dashboard" link, always render). The **Tenants** and **Platform**
+  nav sections are super-admin-only outright, since they touch the
+  control plane's own registry/credentials rather than a single
+  tenant's content.
+- Verified end-to-end against a real SQLite-backed mock D1 (not a
+  reimplementation): bootstrap → create staff admin → confirm zero
+  default access → grant tenant access + a `casinos.read` permission
+  → confirm the grant is scoped to exactly that tenant/resource/
+  action and doesn't leak to others → revoke → disable/re-enable
+  login lockout → last-super-admin protections → CMS create/update/
+  delete with slug-uniqueness and draft-vs-published visibility →
+  homepage renders admin-edited copy with safe fallbacks → nav
+  renders different links for a scoped staff admin vs. a super admin.
+  41 assertions, all passing.
+
+This closes out Phases 9 and 10 of the master plan.
+
 ## Deployment
 
 See **DEPLOYMENT.md** in this same folder for the full, step-by-step

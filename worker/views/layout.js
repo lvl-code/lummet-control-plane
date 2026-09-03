@@ -7,6 +7,15 @@
 // from the normal tenant admin").
 // =====================================================
 
+import { isSuperAdmin, loadPermissionMap, listAccessibleTenants } from "../rbac.js";
+
+// Every item below (besides Dashboard/Overview, always visible) can
+// declare `area` + `resource` to be gated by rbac.js's permission
+// map — a staff admin only ever sees a link if they hold a "read"
+// grant on that area/resource; a super admin sees everything.
+// Items with no `area` (e.g. Tenants/Platform registry actions) are
+// implicitly super-admin-only, since they touch the control plane
+// itself rather than a single tenant's or lummet.com's content.
 const NAV = [
   {
     section: "Dashboard",
@@ -14,6 +23,7 @@ const NAV = [
   },
   {
     section: "Tenants",
+    superAdminOnly: true,
     items: [
       { label: "All Tenants", href: "/tenants", key: "tenants-all" },
       { label: "Add Tenant", href: "/tenants/new", key: "tenants-new" },
@@ -24,31 +34,46 @@ const NAV = [
   {
     section: "Content",
     items: [
-      { label: "Casinos", href: "/content/casinos", key: "content-casinos" },
-      { label: "Reviews", href: "/content/reviews", key: "content-reviews" },
-      { label: "News", href: "/content/news", key: "content-news" },
-      { label: "Updates", href: "/content/updates", key: "content-updates" },
-      { label: "Pages", href: "/content/pages", key: "content-pages" },
-      { label: "Categories", href: "/content/categories", key: "content-categories" },
-      { label: "Countries", href: "/content/countries", key: "content-countries" }
+      { label: "Casinos", href: "/content/casinos", key: "content-casinos", area: "tenant", resource: "casinos" },
+      { label: "Reviews", href: "/content/reviews", key: "content-reviews", area: "tenant", resource: "reviews" },
+      { label: "News", href: "/content/news", key: "content-news", area: "tenant", resource: "news" },
+      { label: "Updates", href: "/content/updates", key: "content-updates", area: "tenant", resource: "updates" },
+      { label: "Pages", href: "/content/pages", key: "content-pages", area: "tenant", resource: "pages" },
+      { label: "Categories", href: "/content/categories", key: "content-categories", area: "tenant", resource: "categories" },
+      { label: "Countries", href: "/content/countries", key: "content-countries", area: "tenant", resource: "countries" }
     ]
   },
   {
     section: "System",
     items: [
-      { label: "Users", href: "/system/users", key: "system-users" },
-      { label: "Permissions", href: "/system/permissions", key: "system-permissions" },
-      { label: "Components", href: "/system/components", key: "system-components" },
-      { label: "Blocks", href: "/system/blocks", key: "system-blocks" },
-      { label: "Navigation", href: "/system/nav-items", key: "system-nav-items" },
-      { label: "Banners", href: "/system/banners", key: "system-banners" },
-      { label: "Media", href: "/system/media", key: "system-media" },
-      { label: "Settings", href: "/system/settings", key: "system-settings" }
+      { label: "Users", href: "/system/users", key: "system-users", area: "tenant", resource: "users" },
+      { label: "Permissions", href: "/system/permissions", key: "system-permissions", area: "tenant", resource: "users" },
+      { label: "Components", href: "/system/components", key: "system-components", area: "tenant", resource: "components" },
+      { label: "Blocks", href: "/system/blocks", key: "system-blocks", area: "tenant", resource: "components" },
+      { label: "Navigation", href: "/system/nav-items", key: "system-nav-items", area: "tenant", resource: "settings" },
+      { label: "Banners", href: "/system/banners", key: "system-banners", area: "tenant", resource: "banners" },
+      { label: "Media", href: "/system/media", key: "system-media", area: "tenant", resource: "media" },
+      { label: "Settings", href: "/system/settings", key: "system-settings", area: "tenant", resource: "settings" }
+    ]
+  },
+  {
+    section: "Lummet Site",
+    items: [
+      { label: "Pages", href: "/cms/pages", key: "cms-pages", area: "cms", resource: "pages" },
+      { label: "Authors", href: "/cms/authors", key: "cms-authors", area: "cms", resource: "authors" },
+      { label: "Brand profiles", href: "/cms/brands", key: "cms-brands", area: "cms", resource: "brands" },
+      { label: "Partners", href: "/cms/partners", key: "cms-partners", area: "cms", resource: "partners" },
+      { label: "Updates", href: "/cms/updates", key: "cms-updates", area: "cms", resource: "updates" },
+      { label: "Publications", href: "/cms/publications", key: "cms-publications", area: "cms", resource: "publications" },
+      { label: "Advertisements", href: "/cms/advertisements", key: "cms-advertisements", area: "cms", resource: "advertisements" },
+      { label: "Homepage settings", href: "/cms/settings", key: "cms-site-settings", area: "cms", resource: "site_settings" }
     ]
   },
   {
     section: "Platform",
+    superAdminOnly: true,
     items: [
+      { label: "Admins", href: "/platform/admins", key: "platform-admins" },
       { label: "API", href: "/platform/api", key: "platform-api" },
       { label: "Credentials", href: "/platform/credentials", key: "platform-credentials" },
       { label: "Audit Logs", href: "/platform/audit-logs", key: "platform-audit-logs" },
@@ -135,6 +160,7 @@ const STYLES = `
     flex-shrink: 0;
   }
   .topbar .who { font-size: 13px; color: var(--text-dim); }
+  .role-badge { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; font-size: 11px; background: var(--accent-soft); color: var(--accent); text-transform: uppercase; letter-spacing: 0.03em; }
   .topbar .logout { font-size: 13px; }
   .content { padding: 28px; overflow-y: auto; }
 
@@ -227,18 +253,34 @@ function escapeHtml(value) {
   }[c]));
 }
 
-function renderNav(activeKey) {
-  return NAV.map(
-    (section) => `
+/**
+ * Filters NAV down to what this admin may actually use, then
+ * renders it. `permMap` is the output of rbac.js's
+ * loadPermissionMap() — `null` means "super admin, allow
+ * everything" (see rbac.js), matching the tenant's own `admin`
+ * role bypassing its permissions table.
+ */
+function renderNav(activeKey, permMap, isSuper) {
+  return NAV.map((section) => {
+    if (section.superAdminOnly && !isSuper) return null;
+
+    const visibleItems = section.items.filter((item) => {
+      if (!item.area) return true; // e.g. Dashboard/Overview — always visible
+      if (permMap === null) return true; // super admin sentinel
+      return !!permMap?.[item.area]?.[item.resource]?.read;
+    });
+    if (visibleItems.length === 0) return null;
+
+    return `
       <div class="nav-section">
         <h4>${escapeHtml(section.section)}</h4>
-        ${section.items
+        ${visibleItems
           .map(
             (item) => `<a href="${item.href}" class="${item.key === activeKey ? "active" : ""}">${escapeHtml(item.label)}</a>`
           )
           .join("")}
-      </div>`
-  ).join("");
+      </div>`;
+  }).filter(Boolean).join("");
 }
 
 async function getSwitcherTenants(env) {
@@ -274,7 +316,10 @@ function renderTenantSwitcher(tenants, activeTenantId) {
  * pages rendered without D1 access (there currently are none).
  */
 export async function renderShell({ title, activeKey, admin, bodyHtml, env }) {
-  const tenants = env ? await getSwitcherTenants(env) : [];
+  const allTenants = env ? await getSwitcherTenants(env) : [];
+  const isSuper = isSuperAdmin(admin);
+  const permMap = env && admin ? await loadPermissionMap(env, admin) : null;
+  const tenants = env && admin ? await listAccessibleTenants(env, admin, allTenants) : allTenants;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -293,13 +338,13 @@ export async function renderShell({ title, activeKey, admin, bodyHtml, env }) {
 <body>
   <nav class="sidebar">
     <div class="brand"><span class="dot">●</span> Lummet</div>
-    ${renderNav(activeKey)}
+    ${renderNav(activeKey, permMap, isSuper)}
   </nav>
   <div class="main">
     <div class="topbar">
       ${admin ? renderTenantSwitcher(tenants, admin.activeTenantId) : "<div></div>"}
       <div class="topbar-right">
-        <div class="who">${admin ? escapeHtml(admin.email) : ""}</div>
+        <div class="who">${admin ? escapeHtml(admin.email) : ""}${admin ? ` <span class="role-badge">${escapeHtml(isSuper ? "super admin" : "staff")}</span>` : ""}</div>
         ${admin ? `<a class="logout" href="#" onclick="fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login');return false;">Log out</a>` : ""}
       </div>
     </div>
