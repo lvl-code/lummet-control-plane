@@ -466,6 +466,12 @@ function renderSeoPageFormScript({ pageType, actionUrl, isEdit, sections, casino
         eligibleCasinos = data.data || [];
         renderCasinoAddOptions();
         renderSelectedCasinos();
+        // Section-level casino pickers (casino_grid / casino_editorial) are
+        // rendered before this fetch resolves when opening an existing page
+        // for edit — capture whatever's already been typed, then re-render
+        // the section rows now that real casino names/IDs are available.
+        syncSectionsFromDom();
+        renderSections();
       }
 
       function renderCasinoAddOptions() {
@@ -544,11 +550,38 @@ function renderSeoPageFormScript({ pageType, actionUrl, isEdit, sections, casino
       };
       const FIELD_LABELS = {
         title: "Title", subtitle: "Subtitle", body: "Body (HTML allowed)",
-        image_url: "Image URL", casino_ids: "Casino IDs (comma-separated)",
-        casino_id: "Casino ID", faq_json: 'FAQ items JSON — e.g. [{"q":"...","a":"..."}]',
+        image_url: "Image URL", casino_ids: "Casinos (select one or more — type to search)",
+        casino_id: "Casino (type to search)", faq_json: "FAQ items (pre-filled with common questions — edit freely, or edit as JSON)",
         cta_url: "Button URL", cta_label: "Button label", background: "Background (CSS color, optional)",
         links_json: 'Links JSON — e.g. [{"label":"...","url":"..."}]'
       };
+
+      // Section data is stored under different keys than the form fields that
+      // edit it (e.g. the faq_json textarea edits section.items, not
+      // section.faq_json). Used both to read the current value into the
+      // field and, for FAQ, to decide when to show the default starter
+      // template instead of a blank textarea.
+      const SECTION_FIELD_TO_DATA_KEY = {
+        faq_json: "items",
+        links_json: "links",
+        cta_url: "url",
+        cta_label: "label"
+      };
+
+      const DEFAULT_FAQ_ITEMS = [
+        { q: "Is this casino safe and legal to play at?", a: "" },
+        { q: "What payment methods are accepted?", a: "" },
+        { q: "Is there a welcome bonus for new players?", a: "" },
+        { q: "Can I play on mobile?", a: "" }
+      ];
+
+      function casinoPickerOptionsHtml(selectedIds) {
+        const pool = (eligibleCasinos && eligibleCasinos.length) ? eligibleCasinos :
+          selectedCasinos.map((c) => ({ id: c.casino_id, name: c.name || ("#" + c.casino_id) }));
+        return pool.map((c) =>
+          '<option value="' + c.id + '"' + (selectedIds.has(c.id) ? " selected" : "") + '>' + escapeForHtml(c.name) + " (#" + c.id + ")" + '</option>'
+        ).join("");
+      }
 
       function sectionRowHtml(section, index) {
         const type = section.type || "rich_text";
@@ -560,9 +593,32 @@ function renderSeoPageFormScript({ pageType, actionUrl, isEdit, sections, casino
             '<button type="button" class="btn btn-secondary btn-small" data-remove-section style="margin-left:auto;">Remove</button>' +
           '</div>' +
           fields.map((f) => {
-            const val = (section[f] !== undefined && section[f] !== null) ? (typeof section[f] === "object" ? JSON.stringify(section[f]) : section[f]) : "";
+            // Casino fields: a real picker sourced from this page's
+            // eligible/selected casinos, instead of a text box where the
+            // editor has to already know (or guess) the numeric casino ID.
+            if (f === "casino_id") {
+              const selId = section.casino_id ? Number(section.casino_id) : null;
+              return '<label>' + FIELD_LABELS[f] + '</label>' +
+                '<select data-section-field="casino_id"><option value="">— Select a casino —</option>' +
+                casinoPickerOptionsHtml(new Set(selId ? [selId] : [])) + '</select>';
+            }
+            if (f === "casino_ids") {
+              const selIds = new Set((Array.isArray(section.casino_ids) ? section.casino_ids : []).map(Number));
+              return '<label>' + FIELD_LABELS[f] + '</label>' +
+                '<select data-section-field="casino_ids" multiple size="6" style="min-height:120px;">' +
+                casinoPickerOptionsHtml(selIds) + '</select>' +
+                '<p style="color:var(--text-dim);font-size:12px;margin:4px 0 10px;">Ctrl/Cmd-click (or long-press on mobile) to select multiple. Type a letter to jump to a casino by name.</p>';
+            }
+            const dataKey = SECTION_FIELD_TO_DATA_KEY[f] || f;
+            let raw = section[dataKey];
+            // FAQ sections start pre-filled with common starter questions
+            // instead of a blank textarea — the editor edits/replaces them
+            // rather than writing JSON from scratch. Only applies while the
+            // section has no items yet.
+            if (f === "faq_json" && (!Array.isArray(raw) || raw.length === 0)) raw = DEFAULT_FAQ_ITEMS;
+            const val = (raw !== undefined && raw !== null) ? (typeof raw === "object" ? JSON.stringify(raw, null, 2) : raw) : "";
             if (f === "body" || f === "faq_json" || f === "links_json") {
-              return '<label>' + FIELD_LABELS[f] + '</label><textarea data-section-field="' + f + '" rows="3">' + escapeForHtml(val) + '</textarea>';
+              return '<label>' + FIELD_LABELS[f] + '</label><textarea data-section-field="' + f + '" rows="' + (f === "body" ? 3 : 6) + '">' + escapeForHtml(val) + '</textarea>';
             }
             return '<label>' + FIELD_LABELS[f] + '</label><input type="text" data-section-field="' + f + '" value="' + escapeForHtml(val) + '" />';
           }).join("") +
@@ -610,11 +666,13 @@ function renderSeoPageFormScript({ pageType, actionUrl, isEdit, sections, casino
           const section = { id: existing.id || ("s" + Date.now() + i), type, position };
           row.querySelectorAll("[data-section-field]").forEach((el) => {
             const key = el.dataset.sectionField;
-            let val = el.value;
             if (key === "casino_ids") {
-              section.casino_ids = val.split(",").map((v) => Number(v.trim())).filter(Boolean);
-            } else if (key === "casino_id") {
-              section.casino_id = Number(val) || null;
+              section.casino_ids = el.multiple ? Array.from(el.selectedOptions).map((o) => Number(o.value)).filter(Boolean) : [];
+              return;
+            }
+            let val = el.value;
+            if (key === "casino_id") {
+              section.casino_id = val ? Number(val) : null;
             } else if (key === "faq_json" || key === "links_json") {
               try { section[key === "faq_json" ? "items" : "links"] = val.trim() ? JSON.parse(val) : []; }
               catch { section[key === "faq_json" ? "items" : "links"] = []; }
