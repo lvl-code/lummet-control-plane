@@ -135,6 +135,16 @@ import {
   proxyEligibleCasinos,
   submitGenerateCategoryCountryDraft
 } from "./views/pages/seo-pages.js";
+import {
+  renderCountriesList,
+  renderCountryForm,
+  renderCategoriesList,
+  renderCategoryForm,
+  submitCreateHubPage,
+  submitUpdateHubPage,
+  submitDeleteHubPage,
+  proxyHubEligibleCasinos
+} from "./views/pages/hub-pages.js";
 
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -836,6 +846,66 @@ export default {
         }
 
         // ---------------------------------------------
+        // Base country/category hub pages
+        // ---------------------------------------------
+
+        if (method === "GET" && path === "/api/hub-pages/eligible-casinos") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "countries", "read"));
+          if (guard) return guard;
+          const countryCode = url.searchParams.get("country_code");
+          const categorySlug = url.searchParams.get("category_slug");
+          if (!countryCode && !categorySlug) return json({ success: false, error: "country_code_or_category_slug_required" }, 422);
+          const result = await proxyHubEligibleCasinos(env, admin, countryCode, categorySlug);
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data || [] });
+        }
+
+        const hubPageParams = matchPath("/api/hub-pages/:kind/:id", path);
+        if (hubPageParams && (method === "PUT" || method === "DELETE")) {
+          const resource = hubPageParams.kind === "country" ? "countries" : "categories";
+          const guard =
+            (await requireActiveTenantAccess()) ||
+            (await requirePermission("tenant", resource, method === "PUT" ? "update" : "delete"));
+          if (guard) return guard;
+          const payload = method === "PUT" ? await request.json().catch(() => ({})) : null;
+          const result =
+            method === "PUT"
+              ? await submitUpdateHubPage(env, admin, hubPageParams.kind, hubPageParams.id, payload)
+              : await submitDeleteHubPage(env, admin, hubPageParams.kind, hubPageParams.id);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource, action: method === "PUT" ? "update" : "delete",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data });
+        }
+
+        const hubPageCreateParams = matchPath("/api/hub-pages/:kind", path);
+        if (hubPageCreateParams && method === "POST") {
+          const resource = hubPageCreateParams.kind === "country" ? "countries" : "categories";
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", resource, "create"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitCreateHubPage(env, admin, hubPageCreateParams.kind, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource, action: "create",
+            success: result.ok, statusCode: result.ok ? 201 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data }, 201);
+        }
+
+        // ---------------------------------------------
         // SEO landing pages (country pages / category×country pages)
         // ---------------------------------------------
 
@@ -1377,6 +1447,40 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
       const guard = await checkResourcePermission("reviews", "read", false);
       if (guard) return guard;
       return html(await renderReviewBlocksPage(env, admin, reviewBlocksParams.slug));
+    }
+
+    if (method === "GET" && path === "/content/countries") {
+      const guard = await checkResourcePermission("countries", "read", false);
+      if (guard) return guard;
+      return html(await renderCountriesList(env, admin));
+    }
+    if (method === "GET" && path === "/content/countries/new") {
+      const guard = await checkResourcePermission("countries", "create", false);
+      if (guard) return guard;
+      return html(await renderCountryForm(env, admin, null));
+    }
+    const countryEditParams = matchPath("/content/countries/:code/edit", path);
+    if (method === "GET" && countryEditParams) {
+      const guard = await checkResourcePermission("countries", "update", false);
+      if (guard) return guard;
+      return html(await renderCountryForm(env, admin, countryEditParams.code));
+    }
+
+    if (method === "GET" && path === "/content/categories") {
+      const guard = await checkResourcePermission("categories", "read", false);
+      if (guard) return guard;
+      return html(await renderCategoriesList(env, admin));
+    }
+    if (method === "GET" && path === "/content/categories/new") {
+      const guard = await checkResourcePermission("categories", "create", false);
+      if (guard) return guard;
+      return html(await renderCategoryForm(env, admin, null));
+    }
+    const categoryEditParams = matchPath("/content/categories/:slug/edit", path);
+    if (method === "GET" && categoryEditParams) {
+      const guard = await checkResourcePermission("categories", "update", false);
+      if (guard) return guard;
+      return html(await renderCategoryForm(env, admin, categoryEditParams.slug));
     }
 
     if (method === "GET" && path === "/content/country-pages") {
