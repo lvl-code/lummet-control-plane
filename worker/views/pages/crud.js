@@ -389,11 +389,21 @@ function renderField(field, record, fieldOptions) {
   }
 
   if (field.type === "select") {
+    // options can be a flat array of strings (value === label), or an
+    // array of {value, label} pairs when the stored value and the
+    // human-readable label need to differ (e.g. nav location codes
+    // like "footer_casinos" displayed as "Footer — Casinos", matching
+    // the tenant's own admin dropdown exactly). Existing plain-string
+    // configs keep working unchanged.
     const options = (field.options || [])
-      .map((opt) => `<option value="${escapeHtml(opt)}" ${value === opt ? "selected" : ""}>${escapeHtml(opt)}</option>`)
+      .map((opt) => {
+        const optValue = typeof opt === "object" ? String(opt.value) : String(opt);
+        const optLabel = typeof opt === "object" ? opt.label : opt;
+        return `<option value="${escapeHtml(optValue)}" ${value === optValue ? "selected" : ""}>${escapeHtml(optLabel)}</option>`;
+      })
       .join("");
     return `
-      <label for="${field.name}">${escapeHtml(field.label)}</label>
+      <label for="${field.name}">${escapeHtml(field.label)}${field.hint ? ` <span style="color:var(--text-dim);font-weight:400;">— ${escapeHtml(field.hint)}</span>` : ""}</label>
       <select id="${field.name}" name="${field.name}">${options}</select>`;
   }
 

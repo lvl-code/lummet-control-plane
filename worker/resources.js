@@ -405,13 +405,37 @@ export const RESOURCES = {
       { key: "enabled", label: "Enabled", type: "bool" }
     ],
     fields: [
-      { name: "label", label: "Label", type: "text", required: true },
-      { name: "url", label: "URL", type: "text", required: true },
-      { name: "location", label: "Location", type: "text", hint: "e.g. header, footer" },
-      { name: "parent_id", label: "Parent nav item ID", type: "number" },
-      { name: "position", label: "Position", type: "number" },
-      { name: "icon", label: "Icon", type: "text" },
-      { name: "is_external", label: "Opens externally", type: "checkbox" },
+      { name: "label", label: "Label", type: "text", required: true, hint: "e.g. Home" },
+      { name: "url", label: "URL", type: "text", required: true, hint: "/en or https://..." },
+      // Fixed set matching the tenant's own admin dropdown exactly
+      // (en/templates/pages/admin/nav.html) — free text here let
+      // editors create nav items under a typo'd location that would
+      // silently never render anywhere.
+      {
+        name: "location", label: "Location", type: "select", required: true,
+        options: [
+          { value: "header", label: "Header" },
+          { value: "footer_casinos", label: "Footer — Casinos" },
+          { value: "footer_company", label: "Footer — Company" },
+          { value: "footer_support", label: "Footer — Support" },
+          { value: "footer_legal", label: "Footer — Legal" },
+          { value: "mobile", label: "Mobile Bottom Nav" },
+          { value: "page", label: "Page Navigation" }
+        ],
+        hint: "\"Page Navigation\" is the contextual nav shown on individual pages (e.g. Crypto Casinos) — separate from the header/footer"
+      },
+      // Was a raw "Parent nav item ID" number field — the editor had to
+      // already know (or guess) another item's numeric id. Same fix as
+      // casino_id/casino_ids elsewhere: a real picker, sourced from this
+      // tenant's own nav items.
+      {
+        name: "parent_id", label: "Parent nav item", type: "resource_select",
+        optionsResource: "nav-items", optionValueKey: "id", optionLabelKey: "label",
+        hint: "for a submenu item — don't pick this same item as its own parent"
+      },
+      { name: "position", label: "Position", type: "number", hint: "lower = first" },
+      { name: "icon", label: "Icon", type: "text", hint: "optional, text or emoji" },
+      { name: "is_external", label: "Opens in a new tab (external link)", type: "checkbox" },
       { name: "enabled", label: "Enabled", type: "checkbox" }
     ]
   },
