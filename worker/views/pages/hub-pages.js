@@ -18,7 +18,6 @@
 import { renderShell, escapeHtml } from "../layout.js";
 import { getFromTenant, postToTenant, putToTenant, deleteFromTenant } from "../../client.js";
 import { getTenant } from "../../registry.js";
-import { renderRichTextField } from "./crud.js";
 
 const BASE_PATH = "/en/api/super";
 
@@ -209,7 +208,7 @@ export async function renderCategoryForm(env, admin, slug) {
 // Shared form shell — country and category hub pages differ
 // only in their identity fields (code+currency+language+
 // legal_status vs slug+description); everything from SEO
-// metadata down (intro, sections, publishing) is identical.
+// metadata down (sections, publishing) is identical.
 // -----------------------------------------------------
 
 function renderHubPageFormShell({ kind, listUrl, actionUrl, tenantName, record, isEdit }) {
@@ -263,15 +262,11 @@ function renderHubPageFormShell({ kind, listUrl, actionUrl, tenantName, record, 
           .map((opt) => `<option value="${opt}" ${(r.robots || "index,follow") === opt ? "selected" : ""}>${opt}</option>`)
           .join("")}
       </select>
+      <p style="font-size:12px;color:var(--text-dim);">${kind === "country" ? "SEO description" : "Description"} doubles as the intro line shown under the page heading — there's no separate intro field, to avoid duplicating it.</p>
     </div>
 
     <div class="card" style="max-width:760px;">
-      <h3 style="margin-top:0;">3. Intro</h3>
-      ${renderRichTextField({ name: "introField", label: "Intro / hero content" }, content.intro || "")}
-    </div>
-
-    <div class="card" style="max-width:760px;">
-      <h3 style="margin-top:0;">4. Content sections</h3>
+      <h3 style="margin-top:0;">3. Content sections</h3>
       <p style="font-size:13px;color:var(--text-dim);margin-top:0;">
         Same section types as Country Pages / Category Countries: rich_text, heading, image, casino_grid,
         casino_editorial, casino_spotlights, faq, cta, internal_links. Reorderable via position. Casino pickers
@@ -284,7 +279,7 @@ function renderHubPageFormShell({ kind, listUrl, actionUrl, tenantName, record, 
     </div>
 
     <div class="card" style="max-width:760px;">
-      <h3 style="margin-top:0;">5. Publishing</h3>
+      <h3 style="margin-top:0;">4. Publishing</h3>
       <label for="statusSelect">Status</label>
       <select id="statusSelect">
         ${["published", "draft"].map((s) => `<option value="${s}" ${(r.status || "published") === s ? "selected" : ""}>${s}</option>`).join("")}
@@ -523,7 +518,6 @@ function renderHubPageFormScript({ kind, actionUrl, isEdit, sections, idValue })
 
       document.getElementById("saveBtn").addEventListener("click", async () => {
         syncSectionsFromDom();
-        const introHidden = document.querySelector('[name="introField"]');
         const payload = {
           name: document.getElementById("nameInput").value,
           seo_title: document.getElementById("seoTitleInput").value,
@@ -531,7 +525,7 @@ function renderHubPageFormScript({ kind, actionUrl, isEdit, sections, idValue })
           robots: document.getElementById("robotsSelect").value,
           status: document.getElementById("statusSelect").value,
           published: document.getElementById("publishedCheck").checked,
-          content_json: { intro: introHidden ? introHidden.value : "", sections: pageSections }
+          content_json: { sections: pageSections }
         };
         if (HUB_KIND === "country") {
           payload.code = document.getElementById("idInput").value;
