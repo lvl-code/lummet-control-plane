@@ -280,6 +280,10 @@ function renderSeoPageFormShell({ pageType, listUrl, actionUrl, tenantName, reco
       <label for="titleInput">Page title</label>
       <input type="text" id="titleInput" value="${escapeHtml(r.title || "")}" required />
 
+      <label for="navLabelInput">Navigation label</label>
+      <input type="text" id="navLabelInput" value="${escapeHtml(r.nav_label || "")}" placeholder="Crypto Casinos" maxlength="40" />
+      <p style="font-size:12px;color:var(--text-dim);margin-top:-8px;">Shown in the hub page's sub-navigation tabs — keep it short (2-4 words). Leave blank to use the page title above.</p>
+
       <label for="seoTitleInput">SEO title</label>
       <input type="text" id="seoTitleInput" value="${escapeHtml(r.seo_title || "")}" />
 
@@ -760,6 +764,7 @@ function renderSeoPageFormScript({ pageType, actionUrl, isEdit, sections, casino
 
         const payload = {
           title: document.getElementById("titleInput").value,
+          nav_label: document.getElementById("navLabelInput").value || null,
           seo_title: document.getElementById("seoTitleInput").value,
           seo_description: document.getElementById("seoDescInput").value,
           og_image: document.getElementById("ogImageInput").value,
