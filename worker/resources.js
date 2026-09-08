@@ -272,7 +272,10 @@ export const RESOURCES = {
       { name: "language", label: "Language", type: "text" },
       { name: "legal_status", label: "Legal status", type: "text" },
       { name: "seo_title", label: "SEO title", type: "text" },
-      { name: "seo_description", label: "SEO description", type: "textarea" }
+      { name: "seo_description", label: "SEO description", type: "textarea" },
+      { name: "is_featured", label: "Featured on /en/country directory", type: "select", options: ["0", "1"] },
+      { name: "featured_position", label: "Featured position", type: "number", hint: "Lower shows first" },
+      { name: "tier", label: "Tier", type: "select", options: ["1", "2", "3"], hint: "1=Deep coverage, 2=Secondary, 3=Directory only — planning label only" }
     ]
   },
 
