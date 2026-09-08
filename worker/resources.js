@@ -263,7 +263,18 @@ export const RESOURCES = {
     listColumns: [
       { key: "name", label: "Name" },
       { key: "code", label: "Code" },
-      { key: "legal_status", label: "Legal status" }
+      { key: "legal_status", label: "Legal status" },
+      {
+        key: "published",
+        label: "Status",
+        toggle: {
+          onLabel: "Published",
+          offLabel: "Draft",
+          pairField: "status",
+          pairOnValue: "published",
+          pairOffValue: "draft"
+        }
+      }
     ],
     fields: [
       { name: "code", label: "Code", type: "text", required: true, lockOnEdit: true },

@@ -76,7 +76,8 @@ import {
   renderResourceForm,
   submitCreate,
   submitUpdate,
-  submitDelete
+  submitDelete,
+  submitToggleField
 } from "./views/pages/crud.js";
 import {
   renderSettingsPage,
@@ -1521,9 +1522,10 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
   const newParams = matchPath(`/${section}/:resource/new`, path);
   const editParams = matchPath(`/${section}/:resource/:id/edit`, path);
   const deleteParams = matchPath(`/${section}/:resource/:id/delete`, path);
+  const toggleFieldParams = matchPath(`/${section}/:resource/:id/toggle-field`, path);
   const listParams = matchPath(`/${section}/:resource`, path);
 
-  const resourceKey = (newParams || editParams || deleteParams || listParams)?.resource;
+  const resourceKey = (newParams || editParams || deleteParams || toggleFieldParams || listParams)?.resource;
   if (!resourceKey) return null;
 
   const config = getResourceConfig(resourceKey);
@@ -1602,6 +1604,35 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
     await logAudit(env, {
       adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
       resource: resourceKey, resourceId: deleteParams.id, action: "delete",
+      success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+      errorMessage: result.ok ? null : result.message || result.error || result.reason,
+      requestId, ipHash
+    });
+
+    return json(
+      { success: result.ok, error: result.ok ? undefined : result.reason || result.error },
+      result.ok ? 200 : result.status || 400
+    );
+  }
+
+  if (method === "POST" && toggleFieldParams) {
+    const guard = await checkResourcePermission(resourceKey, "update", true);
+    if (guard) return guard;
+
+    const payload = await request.json().catch(() => ({}));
+    const toggleConfig = config.listColumns.find((c) => c.toggle && c.key === payload.field);
+    if (!toggleConfig) return json({ success: false, error: "not_toggleable" }, 422);
+
+    const result = await submitToggleField(env, admin, resourceKey, toggleFieldParams.id, {
+      key: toggleConfig.key,
+      pairField: toggleConfig.toggle.pairField,
+      pairOnValue: toggleConfig.toggle.pairOnValue,
+      pairOffValue: toggleConfig.toggle.pairOffValue
+    });
+
+    await logAudit(env, {
+      adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+      resource: resourceKey, resourceId: toggleFieldParams.id, action: `toggle_${toggleConfig.key}`,
       success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
       errorMessage: result.ok ? null : result.message || result.error || result.reason,
       requestId, ipHash

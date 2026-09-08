@@ -200,6 +200,9 @@ const STYLES = `
   .badge-warn { background: rgba(245, 166, 35, 0.14); color: var(--warn); }
   .badge-danger { background: rgba(240, 82, 107, 0.14); color: var(--danger); }
   .badge-dim { background: rgba(144, 150, 172, 0.14); color: var(--text-dim); }
+  .badge-toggle-btn { border: none; cursor: pointer; font-family: inherit; transition: filter 0.15s ease; }
+  .badge-toggle-btn:hover { filter: brightness(0.9); }
+  .badge-toggle-btn:disabled { opacity: 0.6; cursor: default; }
 
   .btn {
     display: inline-block;

@@ -246,7 +246,20 @@ export async function renderResourceList(env, admin, resourceKey, config, flash,
                   .map((row) => {
                     const id = row[config.idField];
                     return `<tr>
-                      ${config.listColumns.map((c) => `<td>${formatCell(row[c.key], c.type)}</td>`).join("")}
+                      ${config.listColumns
+                        .map((c) => {
+                          if (c.toggle) {
+                            const isOn = !!row[c.key];
+                            return `<td>
+                              <button type="button" class="badge badge-toggle-btn ${isOn ? "badge-ok" : "badge-dim"}"
+                                onclick="lummetToggleField('${base}/${encodeURIComponent(id)}/toggle-field', '${escapeHtml(c.key)}', this)">
+                                ${escapeHtml(isOn ? c.toggle.onLabel : c.toggle.offLabel)}
+                              </button>
+                            </td>`;
+                          }
+                          return `<td>${formatCell(row[c.key], c.type)}</td>`;
+                        })
+                        .join("")}
                       <td>
                         <a href="${base}/${encodeURIComponent(id)}/edit">${config.roleOnly ? "Edit role" : "Edit"}</a>
                         ${resourceKey === "users" ? ` &nbsp;·&nbsp; <a href="/system/users/${encodeURIComponent(id)}/item-access">Item access</a>` : ""}
@@ -273,6 +286,21 @@ export async function renderResourceList(env, admin, resourceKey, config, flash,
             else alert('Delete failed: ' + (data.error || 'unknown error'));
           })
           .catch(() => alert('Delete failed.'));
+      }
+
+      function lummetToggleField(path, field, btn) {
+        btn.disabled = true;
+        fetch(path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ field })
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) location.reload();
+            else { alert('Could not update: ' + (data.error || 'unknown error')); btn.disabled = false; }
+          })
+          .catch(() => { alert('Network error.'); btn.disabled = false; });
       }
     </script>
   `;
@@ -1196,6 +1224,39 @@ export async function submitUpdate(env, admin, resourceKey, config, id, form) {
 
   const result = await putToTenant(env, tenant, `${BASE_PATH}/${resourceKey}/${encodeURIComponent(id)}`, body);
   return result;
+}
+
+/**
+ * Flips one field on an existing record (e.g. Published <-> Draft
+ * from the list view, no edit form needed) by fetching the full
+ * current record and PUTting it back with just that field changed —
+ * the exact same fetch->merge->PUT path submitUpdate() uses, so this
+ * can never touch or lose any field the edit form doesn't already
+ * touch. `pairField`/`pairOnValue`/`pairOffValue` let one click flip
+ * a second, related field in lockstep (e.g. countries' `status`
+ * column alongside `published`, so the two never drift out of sync).
+ */
+export async function submitToggleField(env, admin, resourceKey, id, toggleConfig) {
+  const { tenant } = await resolveActiveTenant(env, admin);
+  if (!tenant) return { ok: false, error: "no_active_tenant" };
+
+  const existingResult = await getFromTenant(env, tenant, `${BASE_PATH}/${resourceKey}/${encodeURIComponent(id)}`);
+  if (!existingResult.ok) return existingResult;
+
+  const existingRecord = existingResult.data.data || {};
+  const currentlyOn = !!existingRecord[toggleConfig.key];
+
+  const body = {};
+  for (const [key, value] of Object.entries(existingRecord)) {
+    if (!NON_WRITABLE_FIELDS.has(key)) body[key] = value;
+  }
+
+  body[toggleConfig.key] = currentlyOn ? 0 : 1;
+  if (toggleConfig.pairField) {
+    body[toggleConfig.pairField] = currentlyOn ? toggleConfig.pairOffValue : toggleConfig.pairOnValue;
+  }
+
+  return putToTenant(env, tenant, `${BASE_PATH}/${resourceKey}/${encodeURIComponent(id)}`, body);
 }
 
 export async function submitDelete(env, admin, resourceKey, id) {
