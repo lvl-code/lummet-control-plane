@@ -329,6 +329,10 @@ function renderField(field, record, fieldOptions) {
     return renderGeoRulesField(field, rawStoredValue, (fieldOptions && fieldOptions[field.optionsResource]) || []);
   }
 
+  if (field.type === "geo_destinations") {
+    return renderGeoDestinationsField(field, rawStoredValue, (fieldOptions && fieldOptions[field.optionsResource]) || []);
+  }
+
   if (field.type === "resource_select") {
     return renderResourceSelectField(field, rawStoredValue, (fieldOptions && fieldOptions[field.optionsResource]) || []);
   }
@@ -713,6 +717,7 @@ function renderMultiSelectField(field, rawStoredValue, options) {
 // -----------------------------------------------------
 
 let geoRulesInstanceCounter = 0;
+let geoDestinationsInstanceCounter = 0;
 
 function geoRuleRowHtml(instanceId, code, label, status, bonusOverride) {
   const safeCode = escapeHtml(code);
@@ -804,6 +809,107 @@ function renderGeoRulesField(field, rawStoredValue, countries) {
               '<td style="padding:6px 8px;"><select data-geo-status style="width:auto;"><option value="allowed">Allowed</option><option value="blocked">Blocked</option></select></td>' +
               '<td style="padding:6px 8px;"><input type="text" data-geo-bonus placeholder="optional" style="width:100%;margin:0;" /></td>' +
               '<td style="padding:6px 8px;"><button type="button" class="btn btn-secondary btn-small" data-geo-remove>✕</button></td>';
+            tbody.appendChild(tr);
+            addSelect.value = "";
+            sync();
+          });
+        }
+
+        sync();
+        tbody.closest("form")?.addEventListener("submit", sync);
+      })();
+    </script>`;
+}
+
+// Sibling of renderGeoRulesField()/geoRuleRowHtml() above, for
+// tracking_links.geo_destinations (tracking_link_geo_destinations on
+// the tenant side) -- a simpler two-column shape (country + override
+// URL only, no status/bonus_override) since blocking is already
+// handled by the plain allowed_geos/blocked_geos list fields on this
+// same resource. See worker/database/tracking-links.js's
+// setGeoDestinations() on the tenant for the exact shape expected.
+function geoDestinationRowHtml(instanceId, code, label, destinationUrl) {
+  const safeCode = escapeHtml(code);
+  return `
+    <tr data-geodest-row data-country="${safeCode}">
+      <td style="padding:6px 8px;">${escapeHtml(label)} <span class="mono" style="color:var(--text-dim);">(${safeCode})</span></td>
+      <td style="padding:6px 8px;"><input type="text" data-geodest-url value="${escapeHtml(destinationUrl || "")}" placeholder="https://..." style="width:100%;margin:0;" /></td>
+      <td style="padding:6px 8px;"><button type="button" class="btn btn-secondary btn-small" data-geodest-remove>✕</button></td>
+    </tr>`;
+}
+
+function renderGeoDestinationsField(field, rawStoredValue, countries) {
+  const instanceId = `geodest_${field.name}_${geoDestinationsInstanceCounter++}`;
+  const destinations = Array.isArray(rawStoredValue) ? rawStoredValue : [];
+  const labelByCode = {};
+  for (const c of countries) labelByCode[c[field.optionValueKey]] = c[field.optionLabelKey];
+
+  const rowsHtml = destinations
+    .map((d) => geoDestinationRowHtml(instanceId, d.country_code, labelByCode[d.country_code] || d.country_code, d.destination_url))
+    .join("");
+
+  const countryOptionsHtml = countries
+    .map((c) => `<option value="${escapeHtml(c[field.optionValueKey])}" data-label="${escapeHtml(c[field.optionLabelKey])}">${escapeHtml(c[field.optionLabelKey])} (${escapeHtml(c[field.optionValueKey])})</option>`)
+    .join("");
+
+  return `
+    <label>${escapeHtml(field.label)}${field.hint ? ` <span style="color:var(--text-dim);font-weight:400;">— ${escapeHtml(field.hint)}</span>` : ""}</label>
+    <div class="geo-destinations-field" id="${instanceId}" style="margin-bottom:14px;">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:10px;" id="${instanceId}_table">
+        <thead><tr style="text-align:left;font-size:12px;color:var(--text-dim);"><th style="padding:6px 8px;">Country</th><th style="padding:6px 8px;">Override destination URL</th><th></th></tr></thead>
+        <tbody id="${instanceId}_rows">${rowsHtml}</tbody>
+      </table>
+      ${countries.length ? `
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="${instanceId}_add_country" style="flex:1;">
+          <option value="">Add a country…</option>
+          ${countryOptionsHtml}
+        </select>
+        <button type="button" class="btn btn-secondary btn-small" id="${instanceId}_add_btn">Add</button>
+      </div>` : `<div style="color:var(--text-dim);font-size:13px;">No countries configured yet.</div>`}
+      <input type="hidden" name="${field.name}" id="${instanceId}_input" />
+    </div>
+    <script>
+      (function() {
+        const tbody = document.getElementById("${instanceId}_rows");
+        const hidden = document.getElementById("${instanceId}_input");
+        const addSelect = document.getElementById("${instanceId}_add_country");
+        const addBtn = document.getElementById("${instanceId}_add_btn");
+
+        function sync() {
+          const rows = Array.from(tbody.querySelectorAll("[data-geodest-row]"));
+          const destinations = rows.map(function(tr) {
+            return {
+              country_code: tr.getAttribute("data-country"),
+              destination_url: tr.querySelector("[data-geodest-url]").value
+            };
+          }).filter(function(d) { return d.destination_url; }); // drop rows left blank rather than send an unusable override
+          hidden.value = JSON.stringify(destinations);
+        }
+
+        tbody.addEventListener("change", sync);
+        tbody.addEventListener("input", sync);
+        tbody.addEventListener("click", function(e) {
+          if (e.target.closest("[data-geodest-remove]")) {
+            e.target.closest("tr").remove();
+            sync();
+          }
+        });
+
+        if (addBtn) {
+          addBtn.addEventListener("click", function() {
+            const code = addSelect.value;
+            if (!code) return;
+            if (tbody.querySelector('[data-country="' + code + '"]')) { addSelect.value = ""; return; }
+            const opt = addSelect.options[addSelect.selectedIndex];
+            const label = opt.getAttribute("data-label") || code;
+            const tr = document.createElement("tr");
+            tr.setAttribute("data-geodest-row", "1");
+            tr.setAttribute("data-country", code);
+            tr.innerHTML =
+              '<td style="padding:6px 8px;">' + label + ' <span class="mono" style="color:var(--text-dim);">(' + code + ')</span></td>' +
+              '<td style="padding:6px 8px;"><input type="text" data-geodest-url placeholder="https://..." style="width:100%;margin:0;" /></td>' +
+              '<td style="padding:6px 8px;"><button type="button" class="btn btn-secondary btn-small" data-geodest-remove>✕</button></td>';
             tbody.appendChild(tr);
             addSelect.value = "";
             sync();
@@ -984,6 +1090,18 @@ function coerceFieldValue(field, rawValue, form) {
         parsed = JSON.parse(text);
       } catch (error) {
         throw new Error(`"${field.label}" rules were malformed — please try again.`);
+      }
+      return Array.isArray(parsed) ? parsed : [];
+    }
+
+    case "geo_destinations": {
+      const text = (rawValue ?? "").trim();
+      if (!text) return [];
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (error) {
+        throw new Error(`"${field.label}" overrides were malformed — please try again.`);
       }
       return Array.isArray(parsed) ? parsed : [];
     }

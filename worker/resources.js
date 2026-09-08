@@ -467,6 +467,225 @@ export const RESOURCES = {
       { name: "end_date", label: "End date", type: "text", hint: "ISO date, optional" },
       { name: "enabled", label: "Enabled", type: "checkbox" }
     ]
+  },
+
+  // =====================================================
+  // Systems 1-3: Affiliate Partner/Program Management, Offer &
+  // Bonus Management, Tracking Link Management. Every field/type/
+  // required/lockOnEdit rule below verified directly against the
+  // tenant's actual code, same discipline as every resource above:
+  //   - en/worker/database/affiliate-partners.js, affiliate-programs.js,
+  //     affiliate-accounts.js, affiliate-commercial-terms.js, offers.js,
+  //     tracking-links.js  (the actual INSERT/UPDATE column lists)
+  //   - en/worker/super/handlers-affiliate.js  (the actual
+  //     validateRequired([...]) lists this Super API enforces)
+  //
+  // "commercial-terms" is deliberately create+list only (supportsDelete:
+  // false, every field lockOnEdit) -- terms are versioned/immutable by
+  // design (see migrations/0023_affiliate_partners_programs.sql).
+  // Superseding a term is a two-step action (close the old one, open a
+  // new one with a later effective_date), not a field edit, so it is
+  // not bolted onto the generic edit-in-place form. "offers" and
+  // "tracking-links" are create+update but never delete, matching the
+  // tenant's own /api/v1/offer/* and /api/v1/tracking-link/* routes,
+  // which likewise have no delete endpoint (status transitions only).
+  // =====================================================
+
+  "affiliate-partners": {
+    label: "Affiliate Partners",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: true,
+    listColumns: [
+      { key: "name", label: "Name" },
+      { key: "slug", label: "Slug" },
+      { key: "partner_type", label: "Type" },
+      { key: "status", label: "Status" }
+    ],
+    fields: [
+      { name: "name", label: "Name", type: "text", required: true },
+      { name: "slug", label: "Slug", type: "text", hint: "leave blank to auto-generate from name" },
+      { name: "website", label: "Website", type: "text" },
+      { name: "description", label: "Description", type: "textarea" },
+      { name: "partner_type", label: "Partner type", type: "select", options: ["network", "direct", "agency", "other"] },
+      { name: "status", label: "Status", type: "select", options: ["active", "inactive", "archived"] },
+      { name: "contact_name", label: "Primary contact name", type: "text" },
+      { name: "contact_email", label: "Primary contact email", type: "text" },
+      { name: "contact_phone", label: "Primary contact phone", type: "text" },
+      { name: "notes", label: "Notes", type: "textarea" },
+      { name: "external_reference", label: "External reference", type: "text", hint: "optional ID in the partner's own system" }
+    ]
+  },
+
+  "affiliate-programs": {
+    label: "Affiliate Programs",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: true,
+    listColumns: [
+      { key: "name", label: "Name" },
+      { key: "partner_id", label: "Partner ID" },
+      { key: "status", label: "Status" }
+    ],
+    fields: [
+      // Verified: updateProgram's SET clause does not include
+      // partner_id -- a program cannot be moved to a different
+      // partner after creation.
+      { name: "partner_id", label: "Partner", type: "resource_select", required: true, lockOnEdit: true, optionsResource: "affiliate-partners", optionValueKey: "id", optionLabelKey: "name" },
+      { name: "name", label: "Program name", type: "text", required: true },
+      { name: "status", label: "Status", type: "select", options: ["active", "paused", "ended", "archived"] },
+      { name: "portal_url", label: "Portal URL", type: "text" },
+      { name: "supported_geos", label: "Supported GEOs", type: "list", hint: "one ISO country code per line, blank = no restriction" },
+      { name: "reporting_notes", label: "Reporting notes", type: "textarea" },
+      { name: "notes", label: "Notes", type: "textarea" },
+      // Not a real column -- the Super API reads/writes this
+      // through affiliate_program_casinos, same virtual-field
+      // pattern as casinos.category_ids above.
+      { name: "casino_ids", label: "Covered casinos", type: "multi_select", optionsResource: "casinos", optionValueKey: "id", optionLabelKey: "name", castTo: "number", hint: "a casino can be covered by more than one program at once" }
+    ]
+  },
+
+  "affiliate-accounts": {
+    label: "Affiliate Accounts",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: true,
+    listColumns: [
+      { key: "account_name", label: "Account" },
+      { key: "program_id", label: "Program ID" },
+      { key: "status", label: "Status" }
+    ],
+    fields: [
+      // Verified: updateAccount's SET clause does not include
+      // program_id -- an account cannot be reassigned to a
+      // different program after creation.
+      { name: "program_id", label: "Program", type: "resource_select", required: true, lockOnEdit: true, optionsResource: "affiliate-programs", optionValueKey: "id", optionLabelKey: "name" },
+      { name: "account_name", label: "Account name", type: "text", required: true },
+      { name: "external_account_id", label: "External account ID", type: "text" },
+      { name: "status", label: "Status", type: "select", options: ["active", "inactive", "archived"] },
+      { name: "portal_url", label: "Portal URL", type: "text" },
+      { name: "credential_reference", label: "Credential reference", type: "text", hint: "a pointer to where the real credential is stored (e.g. a secret-store key name) -- never paste an actual password, token, or API key here" },
+      { name: "notes", label: "Notes", type: "textarea" }
+    ]
+  },
+
+  "commercial-terms": {
+    label: "Commercial Terms",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: false,
+    listColumns: [
+      { key: "program_id", label: "Program ID" },
+      { key: "term_type", label: "Type" },
+      { key: "effective_date", label: "Effective" },
+      { key: "status", label: "Status" }
+    ],
+    fields: [
+      // Every field below is lockOnEdit: terms are versioned and
+      // immutable once created (see handlers-affiliate.js's
+      // handleUpdateTerm, which rejects any edit attempt with a
+      // 409). The edit screen intentionally becomes read-only as a
+      // result -- creating a new term (with a later effective_date)
+      // is the only supported way to change commercial terms.
+      { name: "program_id", label: "Program", type: "resource_select", required: true, lockOnEdit: true, optionsResource: "affiliate-programs", optionValueKey: "id", optionLabelKey: "name" },
+      { name: "account_id", label: "Account (optional -- blank = program-wide)", type: "resource_select", lockOnEdit: true, optionsResource: "affiliate-accounts", optionValueKey: "id", optionLabelKey: "account_name" },
+      { name: "casino_id", label: "Casino (optional -- blank = all casinos in this program)", type: "resource_select", lockOnEdit: true, optionsResource: "casinos", optionValueKey: "id", optionLabelKey: "name" },
+      { name: "geo_code", label: "GEO (optional, ISO country code)", type: "text", lockOnEdit: true },
+      { name: "term_type", label: "Term type", type: "select", required: true, lockOnEdit: true, options: ["cpa", "revshare", "hybrid", "fixed_fee", "custom"] },
+      { name: "cpa_amount", label: "CPA amount", type: "number", step: "0.01", lockOnEdit: true },
+      { name: "revshare_percent", label: "Revenue share %", type: "number", step: "0.01", lockOnEdit: true },
+      { name: "hybrid_cpa_amount", label: "Hybrid CPA amount", type: "number", step: "0.01", lockOnEdit: true },
+      { name: "hybrid_revshare_percent", label: "Hybrid revenue share %", type: "number", step: "0.01", lockOnEdit: true },
+      { name: "fixed_fee_amount", label: "Fixed fee amount", type: "number", step: "0.01", lockOnEdit: true },
+      { name: "currency", label: "Currency", type: "text", lockOnEdit: true },
+      { name: "custom_terms_json", label: "Custom terms (JSON)", type: "json_raw", lockOnEdit: true },
+      { name: "effective_date", label: "Effective date", type: "text", required: true, hint: "ISO date, e.g. 2026-01-01", lockOnEdit: true },
+      { name: "expiry_date", label: "Expiry date", type: "text", hint: "ISO date, blank = open-ended", lockOnEdit: true },
+      { name: "notes", label: "Notes", type: "textarea", lockOnEdit: true }
+    ]
+  },
+
+  offers: {
+    label: "Offers & Bonuses",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: false,
+    listColumns: [
+      { key: "internal_name", label: "Name" },
+      { key: "casino_id", label: "Casino ID" },
+      { key: "offer_type", label: "Type" },
+      { key: "status", label: "Status" },
+      { key: "priority", label: "Priority" }
+    ],
+    fields: [
+      // Verified: updateOffer's SET clause does not include
+      // casino_id -- an offer cannot be moved to a different casino
+      // after creation.
+      { name: "casino_id", label: "Casino", type: "resource_select", required: true, lockOnEdit: true, optionsResource: "casinos", optionValueKey: "id", optionLabelKey: "name" },
+      { name: "program_id", label: "Affiliate program (optional)", type: "resource_select", optionsResource: "affiliate-programs", optionValueKey: "id", optionLabelKey: "name" },
+      { name: "offer_type", label: "Offer type", type: "select", required: true, options: ["welcome", "deposit", "no_deposit", "free_spins", "cashback", "reload", "vip", "tournament", "custom"] },
+      { name: "internal_name", label: "Internal name", type: "text", required: true },
+      { name: "public_headline", label: "Public headline", type: "text", hint: "required before the offer can be set to active" },
+      { name: "public_description", label: "Public description", type: "textarea" },
+      { name: "bonus_amount", label: "Bonus amount", type: "number", step: "0.01" },
+      { name: "bonus_percent", label: "Bonus percent", type: "number", step: "0.01" },
+      { name: "currency", label: "Currency", type: "text" },
+      { name: "free_spins_qty", label: "Free spins quantity", type: "number" },
+      { name: "min_deposit", label: "Minimum deposit", type: "number", step: "0.01" },
+      { name: "max_bonus", label: "Maximum bonus", type: "number", step: "0.01" },
+      { name: "wagering_multiplier", label: "Wagering multiplier", type: "number", step: "0.1" },
+      { name: "max_bet", label: "Max bet while wagering", type: "number", step: "0.01" },
+      { name: "eligible_games", label: "Eligible games", type: "text" },
+      { name: "terms_and_conditions", label: "Terms & conditions", type: "textarea" },
+      { name: "start_date", label: "Start date", type: "text", hint: "ISO date, optional" },
+      { name: "expiry_date", label: "Expiry date", type: "text", hint: "ISO date, optional" },
+      { name: "status", label: "Status", type: "select", options: ["draft", "scheduled", "active", "expired", "disabled"], hint: "transitions are validated -- e.g. active can only go to expired/disabled, never back to draft" },
+      { name: "priority", label: "Priority", type: "number", hint: "higher wins when multiple active offers qualify" },
+      { name: "allowed_geos", label: "Allowed GEOs", type: "list", hint: "one ISO country code per line, blank = no extra restriction" },
+      { name: "blocked_geos", label: "Blocked GEOs", type: "list", hint: "one ISO country code per line" }
+    ]
+  },
+
+  "tracking-links": {
+    label: "Tracking Links",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: false,
+    listColumns: [
+      { key: "internal_name", label: "Name" },
+      { key: "tracking_code", label: "Code" },
+      { key: "casino_id", label: "Casino ID" },
+      { key: "status", label: "Status" },
+      { key: "health_status", label: "Health" }
+    ],
+    fields: [
+      { name: "internal_name", label: "Internal name", type: "text", required: true },
+      { name: "tracking_code", label: "Tracking code", type: "text", hint: "leave blank on create to auto-generate; must be unique and cannot match any casino's slug" },
+      { name: "destination_url", label: "Destination URL", type: "text", required: true, hint: "must be https:// and cannot point back at this site's own domain" },
+      { name: "casino_id", label: "Casino (optional)", type: "resource_select", optionsResource: "casinos", optionValueKey: "id", optionLabelKey: "name" },
+      { name: "partner_id", label: "Affiliate partner (optional)", type: "resource_select", optionsResource: "affiliate-partners", optionValueKey: "id", optionLabelKey: "name" },
+      { name: "program_id", label: "Affiliate program (optional)", type: "resource_select", optionsResource: "affiliate-programs", optionValueKey: "id", optionLabelKey: "name" },
+      { name: "offer_id", label: "Offer (optional)", type: "resource_select", optionsResource: "offers", optionValueKey: "id", optionLabelKey: "internal_name" },
+      { name: "campaign", label: "Campaign", type: "text" },
+      { name: "source", label: "Source", type: "text" },
+      { name: "medium", label: "Medium", type: "text" },
+      { name: "content", label: "Content", type: "text" },
+      { name: "allowed_geos", label: "Allowed GEOs", type: "list", hint: "one ISO country code per line, blank = no extra restriction" },
+      { name: "blocked_geos", label: "Blocked GEOs", type: "list", hint: "one ISO country code per line" },
+      { name: "priority", label: "Priority", type: "number" },
+      { name: "status", label: "Status", type: "select", options: ["active", "disabled", "archived"] },
+      // Not a real column on tracking_links -- the tenant's Super API
+      // (handleGetTrackingLink/handleCreateTrackingLink/handleUpdateTrackingLink)
+      // reads/writes these through tracking_link_geo_destinations,
+      // same virtual-field pattern as casinos.geo_rules above.
+      { name: "geo_destinations", label: "GEO destination overrides", type: "geo_destinations", optionsResource: "countries", optionValueKey: "code", optionLabelKey: "name", hint: "send a different destination URL to specific countries instead of the default above" }
+    ]
   }
 };
 

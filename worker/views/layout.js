@@ -42,7 +42,13 @@ const NAV = [
       { label: "Categories", href: "/content/categories", key: "content-categories", area: "tenant", resource: "categories" },
       { label: "Countries", href: "/content/countries", key: "content-countries", area: "tenant", resource: "countries" },
       { label: "Country Pages", href: "/content/country-pages", key: "content-country-pages", area: "tenant", resource: "seo_pages" },
-      { label: "Category Countries", href: "/content/category-countries", key: "content-category-countries", area: "tenant", resource: "seo_pages" }
+      { label: "Category Countries", href: "/content/category-countries", key: "content-category-countries", area: "tenant", resource: "seo_pages" },
+      { label: "Affiliate Partners", href: "/content/affiliate-partners", key: "content-affiliate-partners", area: "tenant", resource: "affiliate-partners" },
+      { label: "Affiliate Programs", href: "/content/affiliate-programs", key: "content-affiliate-programs", area: "tenant", resource: "affiliate-programs" },
+      { label: "Affiliate Accounts", href: "/content/affiliate-accounts", key: "content-affiliate-accounts", area: "tenant", resource: "affiliate-accounts" },
+      { label: "Commercial Terms", href: "/content/commercial-terms", key: "content-commercial-terms", area: "tenant", resource: "commercial-terms" },
+      { label: "Offers & Bonuses", href: "/content/offers", key: "content-offers", area: "tenant", resource: "offers" },
+      { label: "Tracking Links", href: "/content/tracking-links", key: "content-tracking-links", area: "tenant", resource: "tracking-links" }
     ]
   },
   {
