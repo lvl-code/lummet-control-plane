@@ -228,6 +228,6 @@ export function putToTenant(env, tenant, path, body) {
   return requestTenant(env, tenant, { method: "PUT", path, body });
 }
 
-export function deleteFromTenant(env, tenant, path) {
-  return requestTenant(env, tenant, { method: "DELETE", path });
+export function deleteFromTenant(env, tenant, path, body) {
+  return requestTenant(env, tenant, { method: "DELETE", path, body });
 }

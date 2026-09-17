@@ -100,6 +100,17 @@ import {
   submitUpdateReviewBlock,
   submitDeleteReviewBlock
 } from "./views/pages/review-blocks.js";
+import { renderReportsPage, submitCreateReport, submitRunReport } from "./views/pages/reports.js";
+import { renderAlertsPage, submitCreateAlertRule, submitAcknowledgeAlert } from "./views/pages/alerts.js";
+import { renderAnalyticsPage } from "./views/pages/analytics.js";
+import { renderSeoMetaPage, submitSaveSeoMeta, submitDeleteSeoMeta } from "./views/pages/seo-meta.js";
+import {
+  renderIntegrationsPage,
+  submitCreatePostbackConfig, submitUpdatePostbackConfig, submitRotatePostbackToken, submitArchivePostbackConfig,
+  submitCreateProviderAdapter, submitUpdateProviderAdapter, submitArchiveProviderAdapter
+} from "./views/pages/integrations.js";
+import { renderSupportPage, submitReplyInquiry, submitUpdateSubmissionStatus, submitSendNotification } from "./views/pages/support.js";
+import { renderNewsletterPage, submitAddSubscriber, submitUnsubscribe } from "./views/pages/newsletter.js";
 import { runHealthChecks, pruneOldAuditLogs } from "./cron.js";
 import { getCmsResourceConfig } from "./cms-resources.js";
 import {
@@ -846,6 +857,309 @@ export default {
           return json({ success: true });
         }
 
+        if (method === "POST" && path === "/api/reports") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "reports", "create"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitCreateReport(env, admin, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "reports", action: "create",
+            success: result.ok, statusCode: result.ok ? 201 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data }, 201);
+        }
+
+        const runReportParams = matchPath("/api/reports/:id/run", path);
+        if (method === "POST" && runReportParams) {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "reports", "read"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitRunReport(env, admin, runReportParams.id, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "reports", resourceId: runReportParams.id, action: "run",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data });
+        }
+
+        if (method === "POST" && path === "/api/alert-rules") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "analytics_alerts", "create"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitCreateAlertRule(env, admin, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "analytics_alerts", action: "create",
+            success: result.ok, statusCode: result.ok ? 201 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data }, 201);
+        }
+
+        const ackAlertParams = matchPath("/api/alerts/:id/acknowledge", path);
+        if (method === "POST" && ackAlertParams) {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "analytics_alerts", "update"));
+          if (guard) return guard;
+          const result = await submitAcknowledgeAlert(env, admin, ackAlertParams.id);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "analytics_alerts", resourceId: ackAlertParams.id, action: "acknowledge",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        if (method === "POST" && path === "/api/seo") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "seo", "update"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitSaveSeoMeta(env, admin, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "seo", action: "upsert",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        if (method === "DELETE" && path === "/api/seo") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "seo", "delete"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitDeleteSeoMeta(env, admin, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "seo", action: "delete",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        if (method === "POST" && path === "/api/postback-configs") {
+          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitCreatePostbackConfig(env, admin, payload);
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "postback_configs", action: "create",
+            success: result.ok, statusCode: result.ok ? 201 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data }, 201);
+        }
+
+        const updatePostbackParams = matchPath("/api/postback-configs/:id", path);
+        if (method === "PUT" && updatePostbackParams) {
+          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitUpdatePostbackConfig(env, admin, updatePostbackParams.id, payload);
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "postback_configs", resourceId: updatePostbackParams.id, action: "update",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        if (method === "DELETE" && updatePostbackParams) {
+          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          if (guard) return guard;
+          const result = await submitArchivePostbackConfig(env, admin, updatePostbackParams.id);
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "postback_configs", resourceId: updatePostbackParams.id, action: "archive",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        const rotatePostbackParams = matchPath("/api/postback-configs/:id/rotate-token", path);
+        if (method === "POST" && rotatePostbackParams) {
+          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          if (guard) return guard;
+          const result = await submitRotatePostbackToken(env, admin, rotatePostbackParams.id);
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "postback_configs", resourceId: rotatePostbackParams.id, action: "rotate_token",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data });
+        }
+
+        if (method === "POST" && path === "/api/provider-adapters") {
+          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitCreateProviderAdapter(env, admin, payload);
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "provider_adapter_configs", action: "create",
+            success: result.ok, statusCode: result.ok ? 201 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data }, 201);
+        }
+
+        const updateAdapterParams = matchPath("/api/provider-adapters/:id", path);
+        if (method === "PUT" && updateAdapterParams) {
+          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitUpdateProviderAdapter(env, admin, updateAdapterParams.id, payload);
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "provider_adapter_configs", resourceId: updateAdapterParams.id, action: "update",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        if (method === "DELETE" && updateAdapterParams) {
+          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          if (guard) return guard;
+          const result = await submitArchiveProviderAdapter(env, admin, updateAdapterParams.id);
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "provider_adapter_configs", resourceId: updateAdapterParams.id, action: "archive",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        const replyInquiryParams = matchPath("/api/inquiries/:id/reply", path);
+        if (method === "POST" && replyInquiryParams) {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "inquiries", "update"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitReplyInquiry(env, admin, replyInquiryParams.id, payload);
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "inquiries", resourceId: replyInquiryParams.id, action: "reply",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        const submissionStatusParams = matchPath("/api/submissions/:id", path);
+        if (method === "PUT" && submissionStatusParams) {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "submissions", "update"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitUpdateSubmissionStatus(env, admin, submissionStatusParams.id, payload);
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "submissions", resourceId: submissionStatusParams.id, action: "update_status",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        if (method === "POST" && path === "/api/notifications") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "notifications", "create"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitSendNotification(env, admin, payload);
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "notifications", action: "send",
+            success: result.ok, statusCode: result.ok ? 201 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true }, 201);
+        }
+
+        if (method === "POST" && path === "/api/newsletter-subscribers") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "newsletter", "create"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitAddSubscriber(env, admin, payload);
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "newsletter", action: "create",
+            success: result.ok, statusCode: result.ok ? 201 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true }, 201);
+        }
+
+        const unsubParams = matchPath("/api/newsletter-subscribers/:id", path);
+        if (method === "DELETE" && unsubParams) {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "newsletter", "delete"));
+          if (guard) return guard;
+          const result = await submitUnsubscribe(env, admin, unsubParams.id);
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "newsletter", resourceId: unsubParams.id, action: "unsubscribe",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
         // ---------------------------------------------
         // Base country/category hub pages
         // ---------------------------------------------
@@ -1448,6 +1762,48 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
       const guard = await checkResourcePermission("reviews", "read", false);
       if (guard) return guard;
       return html(await renderReviewBlocksPage(env, admin, reviewBlocksParams.slug));
+    }
+
+    if (method === "GET" && path === "/content/reports") {
+      const guard = await checkResourcePermission("reports", "read", false);
+      if (guard) return guard;
+      return html(await renderReportsPage(env, admin));
+    }
+
+    if (method === "GET" && path === "/content/alerts") {
+      const guard = await checkResourcePermission("analytics_alerts", "read", false);
+      if (guard) return guard;
+      return html(await renderAlertsPage(env, admin));
+    }
+
+    if (method === "GET" && path === "/content/analytics") {
+      const guard = await checkResourcePermission("analytics", "read", false);
+      if (guard) return guard;
+      return html(await renderAnalyticsPage(env, admin, Object.fromEntries(url.searchParams)));
+    }
+
+    if (method === "GET" && path === "/content/seo") {
+      const guard = await checkResourcePermission("seo", "read", false);
+      if (guard) return guard;
+      return html(await renderSeoMetaPage(env, admin));
+    }
+
+    if (method === "GET" && path === "/content/integrations") {
+      const guard = requireSuperAdmin();
+      if (guard) return guard;
+      return html(await renderIntegrationsPage(env, admin));
+    }
+
+    if (method === "GET" && path === "/content/support") {
+      const guard = await checkResourcePermission("inquiries", "read", false);
+      if (guard) return guard;
+      return html(await renderSupportPage(env, admin));
+    }
+
+    if (method === "GET" && path === "/content/newsletter") {
+      const guard = await checkResourcePermission("newsletter", "read", false);
+      if (guard) return guard;
+      return html(await renderNewsletterPage(env, admin));
     }
 
     if (method === "GET" && path === "/content/countries") {

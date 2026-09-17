@@ -700,6 +700,80 @@ export const RESOURCES = {
       // same virtual-field pattern as casinos.geo_rules above.
       { name: "geo_destinations", label: "GEO destination overrides", type: "geo_destinations", optionsResource: "countries", optionValueKey: "code", optionLabelKey: "name", hint: "send a different destination URL to specific countries instead of the default above" }
     ]
+  },
+
+  // =====================================================
+  // Campaigns (v9). Verified against
+  // en/worker/database/campaigns.js's createCampaign/updateCampaign --
+  // unlike every resource above, the Super API handler passes the
+  // parsed body straight through to these functions, which destructure
+  // camelCase keys (utmSource, not utm_source) -- field `name` values
+  // below match that wire format exactly, not the DB's own column
+  // names. Full CRUD except delete: no DELETE route exists on the
+  // Super API for campaigns (handlers-reporting.js), same
+  // no-delete convention as offers/tracking-links above.
+  // =====================================================
+  campaigns: {
+    label: "Campaigns",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: false,
+    listColumns: [
+      { key: "name", label: "Name" },
+      { key: "utm_campaign", label: "UTM campaign" },
+      { key: "status", label: "Status" },
+      { key: "start_date", label: "Start" },
+      { key: "end_date", label: "End" }
+    ],
+    fields: [
+      { name: "name", label: "Name", type: "text", required: true },
+      { name: "utmSource", label: "UTM source", type: "text" },
+      { name: "utmMedium", label: "UTM medium", type: "text" },
+      { name: "utmCampaign", label: "UTM campaign", type: "text" },
+      { name: "utmTerm", label: "UTM term", type: "text" },
+      { name: "utmContent", label: "UTM content", type: "text" },
+      { name: "status", label: "Status", type: "select", options: ["active", "paused", "ended", "archived"] },
+      { name: "startDate", label: "Start date", type: "text", hint: "ISO date, optional" },
+      { name: "endDate", label: "End date", type: "text", hint: "ISO date, optional" },
+      { name: "notes", label: "Notes", type: "textarea" }
+    ]
+  },
+
+  // =====================================================
+  // Payment Methods. Verified against en/worker/database/
+  // payment-methods.js's createPaymentMethod/updatePaymentMethod
+  // (snake_case body keys, same as categories) and the Super API
+  // routes added alongside this control-plane change
+  // (worker/super/router.js, "payment_methods" resource key). Slug-
+  // keyed, same shape as categories/countries. Full CRUD.
+  // =====================================================
+  "payment-methods": {
+    label: "Payment Methods",
+    section: "Content",
+    idField: "slug",
+    supportsCreate: true,
+    supportsDelete: true,
+    listColumns: [
+      { key: "name", label: "Name" },
+      { key: "slug", label: "Slug" },
+      { key: "method_type", label: "Type" },
+      { key: "status", label: "Status" },
+      { key: "sort_order", label: "Order" }
+    ],
+    fields: [
+      { name: "slug", label: "Slug", type: "text", required: true, lockOnEdit: true },
+      { name: "name", label: "Name", type: "text", required: true },
+      { name: "method_type", label: "Type", type: "select", options: ["card", "ewallet", "crypto", "bank", "other"] },
+      { name: "icon_url", label: "Icon URL", type: "text" },
+      { name: "description", label: "Description", type: "textarea" },
+      { name: "seo_title", label: "SEO title", type: "text" },
+      { name: "seo_description", label: "SEO description", type: "textarea" },
+      { name: "seo_keywords", label: "SEO keywords", type: "text" },
+      { name: "sort_order", label: "Sort order", type: "number" },
+      { name: "status", label: "Status", type: "select", options: ["published", "draft"] },
+      { name: "published", label: "Published", type: "checkbox" }
+    ]
   }
 };
 

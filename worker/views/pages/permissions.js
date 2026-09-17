@@ -48,9 +48,51 @@ const ACTIONS = ["create", "read", "update", "delete"];
 // checkPermission() calls actually gate — the permissions table
 // itself has no fixed resource enum (it's free-text), so custom
 // resource names can still be added via the "Add resource" field.
+// -----------------------------------------------------------------
+// IMPORTANT: these strings must match, character for character, what
+// each route actually passes to hasPermission() in rbac.js -- that
+// function does a raw exact-string lookup with NO hyphen/underscore
+// normalization (see rbac.js). Verified against index.js directly
+// (both flavors of gate):
+//   - Generic crud.js resources: the gate is whatever key that
+//     resource uses in resources.js's RESOURCES dictionary --
+//     hyphenated for every multi-word one (e.g. "affiliate-partners",
+//     "tracking-links", "payment-methods"). This list previously had
+//     several of these as "affiliate_partners" etc. (underscored,
+//     matching the TENANT's own internal api.js permission strings,
+//     not the control plane's own). That mismatch meant: a
+//     non-super-admin granted "affiliate_partners" via this exact
+//     matrix would NEVER actually pass the real check, since the
+//     route looks up "affiliate-partners" -- the grant silently did
+//     nothing. Fixed below.
+//   - Dedicated (non-generic) routes: the gate is whatever literal
+//     string is hand-written at that route's requirePermission/
+//     checkResourcePermission call -- these already use underscores
+//     ("seo_pages", "analytics_alerts") and were already correct.
+// Resources removed from the list below (ad-rules, platform-updates,
+// permissions, seo, postback_configs, import_batches,
+// provider_adapter_configs, analytics_conversions, the old "nav") are
+// not phantom by accident -- grepping index.js confirms nothing in
+// the control plane currently calls hasPermission with those exact
+// strings (a couple appear ONLY inside logAudit's audit-log label,
+// which is unrelated to enforcement). Toggling them here would set a
+// permissions-table row that is never read by anything. They stay out
+// until each gets a real gated route of its own; setting one up is
+// the same handful-of-lines pattern as ad-rules currently uses
+// (folded into "settings"), reports.js, or alerts.js.
+// -----------------------------------------------------------------
 const DEFAULT_RESOURCES = [
-  "casinos", "reviews", "news", "pages", "categories", "countries",
-  "authors", "media", "components", "banners", "nav_items", "settings"
+  // Content (CMS) -- generic crud.js/resources.js dispatch
+  "casinos", "reviews", "news", "updates", "pages", "categories", "countries",
+  "authors", "media", "components", "banners", "nav-items", "users", "blocks",
+  "affiliate-partners", "affiliate-programs", "affiliate-accounts",
+  "commercial-terms", "offers", "tracking-links", "campaigns", "payment-methods",
+  // Dedicated routes -- literal strings verified at each call site
+  "settings", "seo_pages", "reports", "analytics", "analytics_alerts", "seo",
+  // Support tooling (no tenant-side RBAC exists yet -- see
+  // handlers.js section header on the tenant. This matrix is
+  // currently the ONLY place these are gated at all.)
+  "inquiries", "submissions", "notifications", "newsletter"
 ];
 
 export async function renderPermissionsMatrix(env, admin) {
