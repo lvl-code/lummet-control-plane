@@ -46,6 +46,7 @@ const NAV = [
       { label: "Category Countries", href: "/content/category-countries", key: "content-category-countries", area: "tenant", resource: "seo_pages" },
       { label: "SEO Meta", href: "/content/seo", key: "content-seo", area: "tenant", resource: "seo" },
       { label: "Integrations", href: "/content/integrations", key: "content-integrations", area: "tenant", resource: "postback_configs" },
+      { label: "AI Tools", href: "/content/ai-tools", key: "content-ai-tools", area: "tenant", resource: "ai_tools" },
       { label: "Support", href: "/content/support", key: "content-support", area: "tenant", resource: "inquiries" },
       { label: "Newsletter", href: "/content/newsletter", key: "content-newsletter", area: "tenant", resource: "newsletter" },
       { label: "Affiliate Partners", href: "/content/affiliate-partners", key: "content-affiliate-partners", area: "tenant", resource: "affiliate-partners" },

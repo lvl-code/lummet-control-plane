@@ -110,6 +110,11 @@ import {
   submitCreateProviderAdapter, submitUpdateProviderAdapter, submitArchiveProviderAdapter
 } from "./views/pages/integrations.js";
 import { renderSupportPage, submitReplyInquiry, submitUpdateSubmissionStatus, submitSendNotification } from "./views/pages/support.js";
+import {
+  renderAiToolsPage,
+  submitGenerateReview, submitGenerateSeoCopy, submitGenerateFaqs,
+  submitGenerateSchema, submitGenerateOutline, submitImproveContent, submitSuggestInternalLinks
+} from "./views/pages/ai-tools.js";
 import { renderNewsletterPage, submitAddSubscriber, submitUnsubscribe } from "./views/pages/newsletter.js";
 import { runHealthChecks, pruneOldAuditLogs } from "./cron.js";
 import { getCmsResourceConfig } from "./cms-resources.js";
@@ -1128,6 +1133,41 @@ export default {
           return json({ success: true }, 201);
         }
 
+        // ---- Editorial AI Tools ----
+        // super-admin only (same boundary as postback-configs/
+        // provider-adapters above) rather than the ordinary
+        // permission matrix -- see ai-tools.js header for why.
+        const AI_TOOL_ROUTES = {
+          "/api/ai/generate-review": submitGenerateReview,
+          "/api/ai/generate-seo": submitGenerateSeoCopy,
+          "/api/ai/generate-faqs": submitGenerateFaqs,
+          "/api/ai/generate-schema": submitGenerateSchema,
+          "/api/ai/generate-outline": submitGenerateOutline,
+          "/api/ai/improve-content": submitImproveContent,
+          "/api/ai/suggest-links": submitSuggestInternalLinks
+        };
+        if (method === "POST" && Object.prototype.hasOwnProperty.call(AI_TOOL_ROUTES, path)) {
+          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await AI_TOOL_ROUTES[path](env, admin, payload);
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "ai_tools", action: path.replace("/api/ai/", ""),
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          // Tenant's AI handlers return their fields top-level
+          // (e.g. { success, generated, text }), not nested under
+          // `data` like the ordinary CRUD handlers -- re-nest here
+          // so the page's JS can read `data.data.text` etc.
+          // consistently with every other API route on this page.
+          const { success: _tenantSuccess, ...aiFields } = result.data || {};
+          return json({ success: true, data: aiFields });
+        }
+
         if (method === "POST" && path === "/api/newsletter-subscribers") {
           const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "newsletter", "create"));
           if (guard) return guard;
@@ -1792,6 +1832,12 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
       const guard = requireSuperAdmin();
       if (guard) return guard;
       return html(await renderIntegrationsPage(env, admin));
+    }
+
+    if (method === "GET" && path === "/content/ai-tools") {
+      const guard = requireSuperAdmin();
+      if (guard) return guard;
+      return html(await renderAiToolsPage(env, admin));
     }
 
     if (method === "GET" && path === "/content/support") {
