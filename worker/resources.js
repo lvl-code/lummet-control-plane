@@ -93,6 +93,21 @@ export const RESOURCES = {
         optionLabelKey: "name",
         castTo: "number"
       },
+      // Mirrors category_ids exactly -- see handlers.js's handleGetCasino/
+      // handleCreateCasino/handleUpdateCasino: reads/writes through the
+      // casino_payment_methods join table, not a real `casinos` column.
+      // Previously this join had a database layer (payment-methods.js's
+      // setCasinoPaymentMethods/getPaymentMethodIdsForCasino) but no
+      // Super API wiring and no form field at all.
+      {
+        name: "payment_method_ids",
+        label: "Payment methods",
+        type: "multi_select",
+        optionsResource: "payment-methods",
+        optionValueKey: "id",
+        optionLabelKey: "name",
+        castTo: "number"
+      },
       {
         name: "geo_rules",
         label: "Countries",
@@ -287,6 +302,74 @@ export const RESOURCES = {
       { name: "is_featured", label: "Featured on /en/country directory", type: "select", options: ["0", "1"] },
       { name: "featured_position", label: "Featured position", type: "number", hint: "Lower shows first" },
       { name: "tier", label: "Tier", type: "select", options: ["1", "2", "3"], hint: "1=Deep coverage, 2=Secondary, 3=Directory only — planning label only" }
+    ]
+  },
+
+  research: {
+    label: "Research Zone",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: true,
+    listColumns: [
+      { key: "type", label: "Type" },
+      { key: "title", label: "Title" },
+      { key: "slug", label: "Slug" },
+      { key: "status", label: "Status" },
+      { key: "published", label: "Published", type: "bool" },
+      { key: "featured", label: "Featured", type: "bool" }
+    ],
+    fields: [
+      // Verified against en/worker/database/research.js: updateResearchItem's
+      // SET clause includes every column below (nothing is genuinely
+      // frozen post-create the way pages.slug/casinos.affiliate_url
+      // are elsewhere) -- type/slug together are the unique key
+      // (UNIQUE(type, slug) per migrations/0045_research_core.sql)
+      // but both remain editable, same as categories.slug.
+      {
+        name: "type",
+        label: "Type",
+        type: "select",
+        required: true,
+        options: ["report", "country", "regulator", "topic", "development", "legislation", "licence"],
+        hint: "controls the public URL/template — see docs/research/"
+      },
+      { name: "slug", label: "Slug", type: "text", required: true },
+      { name: "title", label: "Title", type: "text", required: true },
+      { name: "subtitle", label: "Subtitle", type: "text" },
+      { name: "excerpt", label: "Excerpt", type: "textarea" },
+      { name: "content_json", label: "Content", type: "json_object", hint: "{ \"sections\": [...] } — same shape as countries/seo_pages content_json" },
+      {
+        name: "country_id",
+        label: "Country",
+        type: "resource_select",
+        optionsResource: "countries",
+        optionValueKey: "code",
+        optionLabelKey: "name",
+        hint: "leave blank for multi-country reports or cross-border topics"
+      },
+      { name: "author_id", label: "Author", type: "resource_select", optionsResource: "authors", optionValueKey: "id", optionLabelKey: "name" },
+      {
+        name: "status",
+        label: "Status",
+        type: "select",
+        options: [
+          "draft", "researching", "source_review", "fact_check",
+          "editorial_review", "approved", "published",
+          "needs_update", "archived"
+        ]
+      },
+      { name: "published", label: "Published", type: "checkbox" },
+      { name: "featured", label: "Featured", type: "checkbox" },
+      { name: "robots", label: "Robots", type: "select", options: ["index,follow", "noindex,follow", "noindex,nofollow"] },
+      { name: "seo_title", label: "SEO title", type: "text" },
+      { name: "seo_description", label: "SEO description", type: "textarea" },
+      { name: "seo_keywords", label: "SEO keywords", type: "text" },
+      { name: "canonical_url", label: "Canonical URL", type: "text" },
+      { name: "og_image", label: "OG image", type: "media" },
+      { name: "published_at", label: "Published at", type: "text", hint: "ISO date, optional — auto-stamped on first publish" },
+      { name: "last_verified_at", label: "Last verified at", type: "text", hint: "ISO date, optional" },
+      { name: "next_review_at", label: "Next review at", type: "text", hint: "ISO date, optional — drives the overdue-review list" }
     ]
   },
 

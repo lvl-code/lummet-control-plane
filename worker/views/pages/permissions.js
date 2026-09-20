@@ -83,7 +83,7 @@ const ACTIONS = ["create", "read", "update", "delete"];
 // -----------------------------------------------------------------
 const DEFAULT_RESOURCES = [
   // Content (CMS) -- generic crud.js/resources.js dispatch
-  "casinos", "reviews", "news", "updates", "pages", "categories", "countries",
+  "casinos", "reviews", "news", "updates", "pages", "categories", "countries", "research",
   "authors", "media", "components", "banners", "nav-items", "users", "blocks",
   "affiliate-partners", "affiliate-programs", "affiliate-accounts",
   "commercial-terms", "offers", "tracking-links", "campaigns", "payment-methods",
