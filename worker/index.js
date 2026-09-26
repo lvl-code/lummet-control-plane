@@ -1171,17 +1171,6 @@ export default {
           return json({ success: true, data: aiFields });
         }
 
-        // ---- AI Management Chat page ----
-        // No checkResourcePermission()/requireSuperAdmin() guard here
-        // on purpose, matching the API routes below it: this page is
-        // a query surface, not a resource — what an admin can actually
-        // see or change through it is enforced per-message inside
-        // resolver.js/confirm.js, identically for every admin
-        // regardless of role.
-        if (method === "GET" && path === "/ai") {
-          return html(await renderAiChatPage(env, admin));
-        }
-
         // ---- AI Management Chat API (see worker/ai/*) ----
         if (method === "POST" && path === "/api/ai/chat") {
           const payload = await request.json().catch(() => ({}));
@@ -1523,6 +1512,18 @@ export default {
 
       if (method === "GET" && path === "/") {
         return html(await renderDashboardHome(env, admin));
+      }
+
+      // No checkResourcePermission()/requireSuperAdmin() guard here on
+      // purpose, matching the /api/ai/* routes above: this page is a
+      // query surface, not a resource — what an admin can actually see
+      // or change through it is enforced per-message inside
+      // resolver.js/confirm.js, identically for every admin regardless
+      // of role. (This lives in the DASHBOARD PAGES section, not the
+      // isApiRoute block above, because "/ai" itself doesn't start
+      // with "/api/" — only its POST/GET data routes do.)
+      if (method === "GET" && path === "/ai") {
+        return html(await renderAiChatPage(env, admin));
       }
 
       if (path === "/account/password") {
