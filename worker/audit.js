@@ -10,8 +10,8 @@ export async function logAudit(env, entry) {
   try {
     await env.LUMMET_DB.prepare(
       `INSERT INTO lummet_audit_logs
-        (admin_id, tenant_id, endpoint, method, resource, resource_id, action, success, status_code, error_message, request_id, ip_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (admin_id, tenant_id, endpoint, method, resource, resource_id, action, success, status_code, error_message, request_id, ip_hash, initiated_by, ai_conversation_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         entry.adminId || null,
@@ -25,7 +25,14 @@ export async function logAudit(env, entry) {
         entry.statusCode || null,
         entry.errorMessage || null,
         entry.requestId || null,
-        entry.ipHash || null
+        entry.ipHash || null,
+        // Additive (migration 0005): every pre-existing call site omits
+        // these two fields and keeps logging exactly as before —
+        // 'dashboard' is the correct default for all of them. Only the
+        // AI confirm path (worker/ai/confirm.js) passes 'ai' + a
+        // conversation id.
+        entry.initiatedBy || "dashboard",
+        entry.aiConversationId || null
       )
       .run();
   } catch (_) {

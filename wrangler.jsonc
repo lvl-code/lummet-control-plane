@@ -19,6 +19,16 @@
     }
   ],
 
+  // Workers AI binding for the AI management chat (worker/ai/intent.js).
+  // Same binding name/pattern the tenant repo already uses
+  // (en/worker/ai/*.js -> env.AI.run(...)) -- reused here rather than
+  // introducing a separate provider/dependency. If this binding is
+  // absent, intent.js falls back to a deterministic keyword parser
+  // (see intent.js's fallbackIntent) instead of failing closed.
+  "ai": {
+    "binding": "AI"
+  },
+
   // Secrets (set via `wrangler secret put`, never here):
   //   CREDENTIAL_KEK  — base64-encoded 32-byte AES-GCM key
   //                     used to encrypt tenant HMAC secrets at rest.

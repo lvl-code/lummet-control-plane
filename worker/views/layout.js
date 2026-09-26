@@ -19,7 +19,10 @@ import { isSuperAdmin, loadPermissionMap, listAccessibleTenants } from "../rbac.
 const NAV = [
   {
     section: "Dashboard",
-    items: [{ label: "Overview", href: "/", key: "dashboard" }]
+    items: [
+      { label: "Overview", href: "/", key: "dashboard" },
+      { label: "AI Chat", href: "/ai", key: "ai-chat" }
+    ]
   },
   {
     section: "Tenants",

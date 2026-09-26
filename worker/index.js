@@ -116,6 +116,9 @@ import {
   submitGenerateSchema, submitGenerateOutline, submitImproveContent, submitSuggestInternalLinks
 } from "./views/pages/ai-tools.js";
 import { renderNewsletterPage, submitAddSubscriber, submitUnsubscribe } from "./views/pages/newsletter.js";
+import { renderAiChatPage } from "./views/pages/ai-chat.js";
+import { handleChatMessage, listConversations, getOwnedConversation, getMessages } from "./ai/chat.js";
+import { confirmPendingOperation } from "./ai/confirm.js";
 import { runHealthChecks, pruneOldAuditLogs } from "./cron.js";
 import { getCmsResourceConfig } from "./cms-resources.js";
 import {
@@ -1166,6 +1169,80 @@ export default {
           // consistently with every other API route on this page.
           const { success: _tenantSuccess, ...aiFields } = result.data || {};
           return json({ success: true, data: aiFields });
+        }
+
+        // ---- AI Management Chat page ----
+        // No checkResourcePermission()/requireSuperAdmin() guard here
+        // on purpose, matching the API routes below it: this page is
+        // a query surface, not a resource — what an admin can actually
+        // see or change through it is enforced per-message inside
+        // resolver.js/confirm.js, identically for every admin
+        // regardless of role.
+        if (method === "GET" && path === "/ai") {
+          return html(await renderAiChatPage(env, admin));
+        }
+
+        // ---- AI Management Chat API (see worker/ai/*) ----
+        if (method === "POST" && path === "/api/ai/chat") {
+          const payload = await request.json().catch(() => ({}));
+          const result = await handleChatMessage(env, admin, {
+            conversationId: payload.conversationId || null,
+            message: payload.message
+          });
+
+          if (result.ok) {
+            await logAudit(env, {
+              adminId: admin.id,
+              tenantId: result.result?.tenant?.id || admin.activeTenantId,
+              endpoint: path, method,
+              resource: result.intent?.resource || null,
+              action: result.intent?.operation || null,
+              success: result.result?.ok !== false,
+              statusCode: result.result?.ok === false ? (result.result.status || 400) : 200,
+              errorMessage: result.result?.ok === false ? (result.result.message || result.result.error) : null,
+              requestId, ipHash,
+              initiatedBy: "ai", aiConversationId: result.conversationId
+            });
+          }
+
+          if (!result.ok) return json({ success: false, error: result.error, message: result.message }, 400);
+          return json({
+            success: true,
+            data: {
+              conversationId: result.conversationId,
+              reply: result.reply,
+              intent: result.intent,
+              result: result.result
+            }
+          });
+        }
+
+        if (method === "GET" && path === "/api/ai/conversations") {
+          const conversations = await listConversations(env, admin);
+          return json({ success: true, data: conversations });
+        }
+
+        const aiConversationParams = matchPath("/api/ai/conversations/:id", path);
+        if (method === "GET" && aiConversationParams) {
+          const conversation = await getOwnedConversation(env, admin, aiConversationParams.id);
+          if (!conversation) return json({ success: false, error: "not_found" }, 404);
+          const messages = await getMessages(env, conversation.id);
+          return json({ success: true, data: { conversation, messages } });
+        }
+
+        // ---- AI write confirmation ----
+        // The ONLY route in this codebase where confirming an AI chat
+        // message causes a tenant write. Everything here is
+        // re-verified fresh inside confirm.js -- this route is just
+        // the transport.
+        const aiConfirmParams = matchPath("/api/ai/confirm/:id", path);
+        if (method === "POST" && aiConfirmParams) {
+          const payload = await request.json().catch(() => ({}));
+          const result = await confirmPendingOperation(env, admin, aiConfirmParams.id, payload.payloadHash || null);
+          if (!result.ok) {
+            return json({ success: false, error: result.error, message: result.message, conflictingFields: result.conflictingFields }, result.status === 409 ? 409 : 400);
+          }
+          return json({ success: true, data: result });
         }
 
         if (method === "POST" && path === "/api/newsletter-subscribers") {
