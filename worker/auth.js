@@ -39,6 +39,34 @@ export async function hashPassword(password) {
   return `${saltHex}:${hashHex}`;
 }
 
+// Workers don't expose Node's crypto.timingSafeEqual, so this is the
+// same manual constant-time byte comparison already used for Super
+// API HMAC signatures (see the tenant's en/worker/super/auth.js and
+// this repo's signing.js) — kept identical here rather than
+// reimplemented, so both trust-critical comparisons in this codebase
+// share one verified pattern. Exported as a plain, immutable named
+// export solely so the test suite can exercise its own edge-case
+// behavior directly; verifyPassword() below calls this module-level
+// function directly and has no dependency on the export.
+export function constantTimeEqual(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  if (a.length !== b.length) {
+    // Still walk equal-ish length to avoid a cheap length-based
+    // timing signal, then return false regardless.
+    let dummy = 0;
+    const len = Math.max(a.length, b.length);
+    for (let i = 0; i < len; i++) {
+      dummy |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+    }
+    return false;
+  }
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 export async function verifyPassword(password, storedHash) {
   const [saltHex, hashHex] = (storedHash || "").split(":");
   if (!saltHex || !hashHex) return false;
@@ -64,7 +92,7 @@ export async function verifyPassword(password, storedHash) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  return computedHex === hashHex;
+  return constantTimeEqual(computedHex, hashHex);
 }
 
 // -----------------------------------------------------
