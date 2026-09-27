@@ -143,4 +143,46 @@ describe("ai/chat.js handleChatMessage (end-to-end orchestration, no live tenant
     assert.equal(result.result.pendingOperationId, undefined);
     assert.equal(result.result.kind, undefined); // never reaches "write_preview"/executed without a real tenant
   });
+
+  test("/help is handled directly, with no tenant/permission involvement, and works even with no active tenant", async () => {
+    const result = await handleChatMessage(env, { ...adminA, activeTenantId: null }, { conversationId: null, message: "/help" });
+    assert.equal(result.ok, true);
+    assert.equal(result.result.kind, "help");
+    assert.match(result.reply, /casinos:/);
+  });
+
+  test("/help <command> shows that command's fields", async () => {
+    const result = await handleChatMessage(env, adminA, { conversationId: null, message: "/help lu-schema-casinos" });
+    assert.equal(result.ok, true);
+    assert.match(result.reply, /Fields:/);
+  });
+
+  test("a shortcut command resolves through the SAME pipeline as natural language (schema, no tenant needed)", async () => {
+    const result = await handleChatMessage(env, adminA, { conversationId: null, message: "/lu-schema-casinos" });
+    assert.equal(result.ok, true);
+    assert.equal(result.result.kind, "schema");
+    assert.equal(result.intent.operation, "schema");
+  });
+
+  test("an unknown shortcut command is reported with a suggestion, not treated as natural language", async () => {
+    const result = await handleChatMessage(env, adminA, { conversationId: null, message: "/lu-lst-casinos" });
+    assert.equal(result.ok, true);
+    assert.equal(result.result.ok, false);
+    assert.equal(result.result.error, "unknown_command");
+    assert.match(result.reply, /lu-list-casinos/);
+  });
+
+  test("/lu-agent with no goal asks for one instead of running", async () => {
+    const result = await handleChatMessage(env, adminA, { conversationId: null, message: "/lu-agent" });
+    assert.equal(result.ok, true);
+    assert.equal(result.result.ok, false);
+    assert.match(result.reply, /goal/i);
+  });
+
+  test("/lu-agent with a goal runs the bounded agent loop (no env.AI here, so it finishes immediately)", async () => {
+    const result = await handleChatMessage(env, adminA, { conversationId: null, message: "/lu-agent look something up" });
+    assert.equal(result.ok, true);
+    assert.equal(result.intent.operation, "agent");
+    assert.match(result.reply, /Agent steps/);
+  });
 });

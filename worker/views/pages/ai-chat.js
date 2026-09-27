@@ -44,10 +44,10 @@ export async function renderAiChatPage(env, admin) {
 
       <section class="ai-main card">
         <div id="ai-messages" class="ai-messages">
-          <div class="empty">Ask something like "Show me all casinos" or "Show me the fields for casinos".</div>
+          <div class="empty">Ask something like "Show me all casinos", or type /help to see shortcut commands.</div>
         </div>
         <form id="ai-composer" class="ai-composer" onsubmit="return aiSendMessage(event)">
-          <input id="ai-input" type="text" placeholder="Ask the AI to look something up or change something…" autocomplete="off" />
+          <input id="ai-input" type="text" placeholder="Ask, or try /help for shortcut commands…" autocomplete="off" />
           <button class="btn" type="submit" id="ai-send-btn">Send</button>
         </form>
       </section>
@@ -299,7 +299,7 @@ export async function renderAiChatPage(env, admin) {
         aiCurrentConversationId = null;
         aiSetUrlConversation(null);
         aiCloseDrawer();
-        document.getElementById("ai-messages").innerHTML = '<div class="empty">Ask something like "Show me all casinos" or "Show me the fields for casinos".</div>';
+        document.getElementById("ai-messages").innerHTML = '<div class="empty">Ask something like "Show me all casinos", or type /help to see shortcut commands.</div>';
         aiLoadConversations();
       }
 

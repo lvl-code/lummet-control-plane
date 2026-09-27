@@ -8,6 +8,8 @@
 
 import { parseIntent } from "./intent.js";
 import { runAction } from "./action-engine.js";
+import { parseCommandLine, resolveCommandIntent, renderHelp } from "./commands.js";
+import { runAgent } from "./agent.js";
 
 export async function createConversation(env, adminId, tenantId, title = null) {
   const id = crypto.randomUUID();
@@ -124,6 +126,16 @@ export function formatResultAsText(intent, result) {
     return text;
   }
 
+  if (result.kind === "agent_write_proposed") {
+    const stepSummary = result.steps.map((s, i) => `  ${i + 1}. ${s.tool}${s.why ? ` — ${s.why}` : ""}${s.ok === false ? " (failed/denied)" : ""}`).join("\n");
+    return `Agent steps:\n${stepSummary}\n\nThe agent reached a proposed write — see the confirmation card below.`;
+  }
+
+  if (result.kind === "agent_finished" || result.kind === "agent_step_limit") {
+    const stepSummary = result.steps.map((s, i) => `  ${i + 1}. ${s.tool}${s.why ? ` — ${s.why}` : ""}${s.ok === false ? " (failed/denied)" : ""}`).join("\n");
+    return `Agent steps:\n${stepSummary}\n\n${result.summary}`;
+  }
+
   return JSON.stringify(result, null, 2);
 }
 
@@ -149,12 +161,69 @@ export async function handleChatMessage(env, admin, { conversationId, message })
 
   await appendMessage(env, convId, "user", trimmed);
 
-  const history = await getMessages(env, convId, 12);
-  const historyForModel = history
-    .slice(0, -1) // exclude the message we just added, passed separately
-    .map((m) => ({ role: m.role, content: m.content }));
+  // ---- /help : pure lookup, no tenant/permission involved at all,
+  // same info a dashboard user could already see in the nav. ----
+  const cmd = parseCommandLine(trimmed);
+  if (cmd && cmd.name === "help") {
+    const helpText = renderHelp(cmd.positional);
+    await appendMessage(env, convId, "assistant", helpText);
+    return {
+      ok: true,
+      conversationId: convId,
+      intent: { operation: "help", resource: null },
+      result: { ok: true, kind: "help" },
+      reply: helpText
+    };
+  }
 
-  const intent = await parseIntent(env, trimmed, historyForModel);
+  // ---- /lu-agent <goal> : bounded think/search/act mode. Free-text
+  // goal, so it's special-cased ahead of the key=value command
+  // parser rather than tokenized like an ordinary command. ----
+  if (/^\/lu-agent\b/i.test(trimmed)) {
+    const goal = trimmed.replace(/^\/lu-agent\b/i, "").trim();
+    if (!goal) {
+      const msg = "Give the agent a goal, e.g. \"/lu-agent find casinos on freewin.xyz with no bonus_title set\".";
+      await appendMessage(env, convId, "assistant", msg);
+      return { ok: true, conversationId: convId, intent: { operation: "agent", resource: null }, result: { ok: false, message: msg }, reply: msg };
+    }
+    const agentResult = await runAgent(env, admin, { conversationId: convId, goal });
+    const replyText = formatResultAsText({ operation: "agent" }, agentResult);
+    await appendMessage(env, convId, "assistant", replyText, agentResult.preview?.pendingOperationId || null);
+    return {
+      ok: true,
+      conversationId: convId,
+      intent: { operation: "agent", resource: agentResult.preview?.resourceKey || null },
+      result: agentResult.kind === "agent_write_proposed" ? agentResult.preview : agentResult,
+      reply: replyText
+    };
+  }
+
+  // ---- an ordinary /lu-* shortcut command ----
+  let intent;
+  if (cmd) {
+    const resolved = resolveCommandIntent(cmd.name, cmd.args, cmd.positional);
+    if (resolved.isUnknown) {
+      const msg = resolved.suggestion
+        ? `Unknown command /${cmd.name}. Did you mean /${resolved.suggestion}? Try /help for the full list.`
+        : `Unknown command /${cmd.name}. Try /help for the full list.`;
+      await appendMessage(env, convId, "assistant", msg);
+      return {
+        ok: true,
+        conversationId: convId,
+        intent: { operation: "unknown", resource: null },
+        result: { ok: false, error: "unknown_command", message: msg },
+        reply: msg
+      };
+    }
+    intent = resolved.intent;
+  } else {
+    const history = await getMessages(env, convId, 12);
+    const historyForModel = history
+      .slice(0, -1) // exclude the message we just added, passed separately
+      .map((m) => ({ role: m.role, content: m.content }));
+    intent = await parseIntent(env, trimmed, historyForModel);
+  }
+
   const result = await runAction(env, admin, intent, { conversationId: convId });
   const replyText = formatResultAsText(intent, result);
 

@@ -32,6 +32,16 @@
   // Secrets (set via `wrangler secret put`, never here):
   //   CREDENTIAL_KEK  — base64-encoded 32-byte AES-GCM key
   //                     used to encrypt tenant HMAC secrets at rest.
+  //   WEB_SEARCH_API_KEY — optional. Only used by the AI chat's
+  //                     "/lu-agent <goal>" mode (worker/ai/web-search.js)
+  //                     when it decides a web search would help.
+  //                     Without this set, agent mode still works for
+  //                     reads/writes-preview -- web_search just reports
+  //                     "not configured" instead of a result, and the
+  //                     agent explains that rather than inventing one.
+  //                     Defaults to the Brave Search API's request shape;
+  //                     point WEB_SEARCH_ENDPOINT at a different provider
+  //                     if needed.
   //
   // Optional vars:
   //   CONTACT_EMAIL   — if set, shown on the public homepage's
