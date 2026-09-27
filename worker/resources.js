@@ -373,6 +373,194 @@ export const RESOURCES = {
     ]
   },
 
+  // Newsroom Taxonomy (v12 Super API). Verified against
+  // en/worker/database/newsroom-taxonomy.js's KINDS map and
+  // saveTaxonomyItem: fields listed per kind are exactly its
+  // sanitizer list, nothing more. DELETE archives (active = 0) —
+  // these tables never hard-delete rows, so "Delete" in these
+  // screens is really "deactivate"; slug is intentionally NOT
+  // required — the tenant auto-generates it from name on create if
+  // left blank, same convention as casinos/news/authors slugs
+  // elsewhere in this file.
+  "newsroom-sections": {
+    label: "Newsroom Sections",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: true,
+    listColumns: [
+      { key: "name", label: "Name" },
+      { key: "slug", label: "Slug" },
+      { key: "parent_id", label: "Parent ID" },
+      { key: "display_order", label: "Order" },
+      { key: "active", label: "Active", type: "bool" }
+    ],
+    fields: [
+      { name: "name", label: "Name", type: "text", required: true },
+      { name: "slug", label: "Slug", type: "text", hint: "leave blank to auto-generate from name" },
+      { name: "description", label: "Description", type: "textarea" },
+      {
+        name: "parent_id",
+        label: "Parent section",
+        type: "resource_select",
+        optionsResource: "newsroom-sections",
+        optionValueKey: "id",
+        optionLabelKey: "name",
+        hint: "leave blank for a top-level section — a section cannot be its own ancestor (enforced server-side)"
+      },
+      { name: "display_order", label: "Display order", type: "number" },
+      { name: "seo_title", label: "SEO title", type: "text" },
+      { name: "seo_description", label: "SEO description", type: "textarea" },
+      { name: "og_image", label: "OG image", type: "media" },
+      { name: "active", label: "Active", type: "checkbox" }
+    ]
+  },
+
+  "newsroom-topics": {
+    label: "Newsroom Topics",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: true,
+    listColumns: [
+      { key: "name", label: "Name" },
+      { key: "slug", label: "Slug" },
+      { key: "active", label: "Active", type: "bool" }
+    ],
+    fields: [
+      { name: "name", label: "Name", type: "text", required: true },
+      { name: "slug", label: "Slug", type: "text", hint: "leave blank to auto-generate from name" },
+      { name: "description", label: "Description", type: "textarea" },
+      { name: "seo_title", label: "SEO title", type: "text" },
+      { name: "seo_description", label: "SEO description", type: "textarea" },
+      { name: "active", label: "Active", type: "checkbox" }
+    ]
+  },
+
+  "newsroom-entities": {
+    label: "Newsroom Entities",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: true,
+    listColumns: [
+      { key: "name", label: "Name" },
+      { key: "entity_type", label: "Type" },
+      { key: "country_code", label: "Country" },
+      { key: "active", label: "Active", type: "bool" }
+    ],
+    fields: [
+      { name: "name", label: "Name", type: "text", required: true },
+      { name: "slug", label: "Slug", type: "text", hint: "leave blank to auto-generate from name" },
+      {
+        name: "entity_type",
+        label: "Type",
+        type: "select",
+        options: ["company", "operator", "regulator", "person", "organization"],
+        hint: "defaults to \"company\" if left blank on create"
+      },
+      { name: "description", label: "Description", type: "textarea" },
+      { name: "logo_media_id", label: "Logo", type: "media" },
+      { name: "website_url", label: "Website URL", type: "text" },
+      { name: "country_code", label: "Country code", type: "text", hint: "ISO 2-letter code, e.g. GB" },
+      {
+        name: "casino_id",
+        label: "Linked casino",
+        type: "resource_select",
+        optionsResource: "casinos",
+        optionValueKey: "id",
+        optionLabelKey: "name",
+        hint: "optional — links this entity to an existing casino/operator record instead of duplicating it"
+      },
+      { name: "seo_title", label: "SEO title", type: "text" },
+      { name: "seo_description", label: "SEO description", type: "textarea" },
+      { name: "active", label: "Active", type: "checkbox" }
+    ]
+  },
+
+  "newsroom-series": {
+    label: "Newsroom Series",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: true,
+    listColumns: [
+      { key: "name", label: "Name" },
+      { key: "slug", label: "Slug" },
+      { key: "active", label: "Active", type: "bool" }
+    ],
+    fields: [
+      { name: "name", label: "Name", type: "text", required: true },
+      { name: "slug", label: "Slug", type: "text", hint: "leave blank to auto-generate from name" },
+      { name: "description", label: "Description", type: "textarea" },
+      { name: "image_media_id", label: "Series image", type: "media" },
+      { name: "seo_title", label: "SEO title", type: "text" },
+      { name: "seo_description", label: "SEO description", type: "textarea" },
+      { name: "active", label: "Active", type: "checkbox" }
+    ]
+  },
+
+  // Research Engine Phase 2 (v14 Super API). Verified against
+  // en/worker/database/research-sources.js's createSource/
+  // updateSource field lists. Global table — a source is never
+  // duplicated per research item, so this is a standalone CRUD
+  // screen (not nested under Research Zone). DELETE here is a real
+  // hard delete, matching the tenant's own admin route (no
+  // citation-count guard). Research Claims (scoped to one research
+  // item, with claim<->source evidence attachments) are NOT in this
+  // generic CRUD system -- they need a per-item sub-page, same
+  // reasoning as Newsroom's article-relations getting its own
+  // bespoke page instead of a generic resource -- deferred to a
+  // later phase.
+  "research-sources": {
+    label: "Research Sources",
+    section: "Content",
+    idField: "id",
+    supportsCreate: true,
+    supportsDelete: true,
+    listColumns: [
+      { key: "organisation", label: "Organisation" },
+      { key: "source_type", label: "Type" },
+      { key: "status", label: "Status" },
+      { key: "citation_count", label: "Cited by" }
+    ],
+    fields: [
+      { name: "organisation", label: "Organisation", type: "text", required: true },
+      { name: "title", label: "Title", type: "text" },
+      { name: "url", label: "URL", type: "text" },
+      {
+        name: "source_type",
+        label: "Type",
+        type: "select",
+        options: ["regulator", "government", "legislation", "court", "eu_institution",
+          "official_register", "operator", "industry_organization", "academic",
+          "research_organization", "news", "other"],
+        hint: "defaults to \"other\" if left blank"
+      },
+      {
+        name: "country_id",
+        label: "Country",
+        type: "resource_select",
+        optionsResource: "countries",
+        optionValueKey: "code",
+        optionLabelKey: "name"
+      },
+      { name: "is_primary", label: "Primary source", type: "checkbox" },
+      { name: "document_type", label: "Document type", type: "text" },
+      { name: "language", label: "Language", type: "text" },
+      { name: "publication_date", label: "Publication date", type: "text", hint: "ISO date, optional" },
+      { name: "accessed_at", label: "Accessed at", type: "text", hint: "ISO date, optional" },
+      {
+        name: "status",
+        label: "Status",
+        type: "select",
+        options: ["active", "broken", "archived"],
+        hint: "\"broken\" is normally set by the tenant's own link-health check, not edited by hand"
+      },
+      { name: "notes", label: "Notes", type: "textarea" }
+    ]
+  },
+
   authors: {
     label: "Authors",
     section: "Content",

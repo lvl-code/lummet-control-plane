@@ -100,6 +100,11 @@ import {
   submitUpdateReviewBlock,
   submitDeleteReviewBlock
 } from "./views/pages/review-blocks.js";
+import {
+  renderNewsroomTagsPage,
+  submitNewsroomMeta,
+  submitNewsroomRelations
+} from "./views/pages/newsroom-tags.js";
 import { renderReportsPage, submitCreateReport, submitRunReport } from "./views/pages/reports.js";
 import { renderAlertsPage, submitCreateAlertRule, submitAcknowledgeAlert } from "./views/pages/alerts.js";
 import { renderAnalyticsPage } from "./views/pages/analytics.js";
@@ -856,6 +861,44 @@ export default {
           await logAudit(env, {
             adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
             resource: "review_blocks", resourceId: reviewBlockParams.id, action: method === "PUT" ? "update" : "delete",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        const newsroomMetaParams = matchPath("/api/news/:id/newsroom-meta", path);
+        if (newsroomMetaParams && method === "PUT") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "news", "update"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitNewsroomMeta(env, admin, newsroomMetaParams.id, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "newsroom_meta", resourceId: newsroomMetaParams.id, action: "update",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true });
+        }
+
+        const newsroomRelationsParams = matchPath("/api/news/:id/newsroom-relations", path);
+        if (newsroomRelationsParams && method === "PUT") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "news", "update"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitNewsroomRelations(env, admin, newsroomRelationsParams.id, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "newsroom_relations", resourceId: newsroomRelationsParams.id, action: "update",
             success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
             errorMessage: result.ok ? null : result.message || result.error || result.reason,
             requestId, ipHash
@@ -1880,6 +1923,13 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
       const guard = await checkResourcePermission("reviews", "read", false);
       if (guard) return guard;
       return html(await renderReviewBlocksPage(env, admin, reviewBlocksParams.slug));
+    }
+
+    const newsroomTagsParams = matchPath("/content/news/:slug/newsroom", path);
+    if (method === "GET" && newsroomTagsParams) {
+      const guard = await checkResourcePermission("news", "read", false);
+      if (guard) return guard;
+      return html(await renderNewsroomTagsPage(env, admin, newsroomTagsParams.slug));
     }
 
     if (method === "GET" && path === "/content/reports") {

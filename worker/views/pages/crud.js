@@ -668,7 +668,7 @@ function renderMediaPickerField(field, currentId) {
 // type a raw numeric id by hand.
 // -----------------------------------------------------
 
-function renderResourceSelectField(field, currentValue, options) {
+export function renderResourceSelectField(field, currentValue, options) {
   const current = currentValue == null ? "" : String(currentValue);
   const optionsHtml = options
     .map((opt) => {
@@ -696,7 +696,7 @@ function renderResourceSelectField(field, currentValue, options) {
 
 let multiSelectInstanceCounter = 0;
 
-function renderMultiSelectField(field, rawStoredValue, options) {
+export function renderMultiSelectField(field, rawStoredValue, options) {
   const instanceId = `ms_${field.name}_${multiSelectInstanceCounter++}`;
   const selected = new Set(
     (Array.isArray(rawStoredValue) ? rawStoredValue : []).map((v) => String(v))
@@ -1000,6 +1000,13 @@ export async function renderResourceForm(env, admin, resourceKey, config, id, fo
         resourceKey === "reviews" && isEdit
           ? `<div style="border-top:1px solid var(--panel-border);margin-top:18px;padding-top:14px;">
               <a class="btn btn-secondary" href="/content/reviews/${encodeURIComponent(id)}/blocks">Manage extra content blocks</a>
+            </div>`
+          : ""
+      }
+      ${
+        resourceKey === "news" && isEdit
+          ? `<div style="border-top:1px solid var(--panel-border);margin-top:18px;padding-top:14px;">
+              <a class="btn btn-secondary" href="/content/news/${encodeURIComponent(id)}/newsroom">Manage newsroom tags</a>
             </div>`
           : ""
       }
