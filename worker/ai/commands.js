@@ -110,6 +110,26 @@ export function parseArgs(rest) {
         value = s.slice(valStart, i);
       }
       if (word) args[word] = value;
+    } else if (word && /:$/.test(word) && word.length > 1) {
+      // "key: value" alias for "key=value". Phone keyboards autocorrect
+      // "id=1" into "I'd: 1", so normalize that spelling back to "id".
+      let key = word.slice(0, -1).toLowerCase().replace(/[\u2019`]/g, "'");
+      if (key === "i'd") key = "id";
+      while (i < n && isSpace(s[i])) i++;
+      let value;
+      if (s[i] === '"' || s[i] === "'") {
+        const quote = s[i];
+        i++;
+        const valStart = i;
+        while (i < n && s[i] !== quote) i++;
+        value = s.slice(valStart, i);
+        if (i < n) i++;
+      } else {
+        const valStart = i;
+        while (i < n && !isSpace(s[i])) i++;
+        value = s.slice(valStart, i);
+      }
+      if (key && value !== "") args[key] = value;
     } else if (word && positional === null) {
       positional = word;
     }

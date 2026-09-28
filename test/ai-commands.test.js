@@ -68,6 +68,22 @@ describe("ai/commands.js parseArgs", () => {
     assert.deepEqual(args, { tenant: "freewin.xyz" });
   });
 
+  test('"key: value" works as an alias for key=value', () => {
+    const { args } = parseArgs("id: 5 rating: 4.8");
+    assert.deepEqual(args, { id: "5", rating: "4.8" });
+  });
+
+  test("phone-autocorrected \"I'd: 1\" is read as id=1", () => {
+    assert.deepEqual(parseArgs("I'd: 1").args, { id: "1" });
+    assert.deepEqual(parseArgs("I\u2019d: 1").args, { id: "1" });
+  });
+
+  test("a URL value after = is not mistaken for colon syntax", () => {
+    const { args } = parseArgs("affiliate_url=https://example.com/x name=\"A B\"");
+    assert.equal(args.affiliate_url, "https://example.com/x");
+    assert.equal(args.name, "A B");
+  });
+
   test("empty input yields no args and no positional", () => {
     const { args, positional } = parseArgs("");
     assert.deepEqual(args, {});

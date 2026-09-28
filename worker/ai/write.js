@@ -21,6 +21,17 @@ export async function buildWritePreview(env, admin, resolved, intent, { conversa
   const { tenant, resourceKey, config, action } = resolved;
   const proposedValues = intent.fields || {};
 
+  // confirm.js (via crud.js) always writes to the admin's ACTIVE tenant, and
+  // refuses if that differs from the previewed one. Catch it here instead of
+  // showing a preview that can never be confirmed.
+  if (admin.activeTenantId !== tenant.id) {
+    return {
+      ok: false,
+      error: "active_tenant_mismatch",
+      message: `This targets ${tenant.name}, but your active tenant is different. Switch to ${tenant.name} with the tenant switcher at the top, then run it again.`
+    };
+  }
+
   const validation = validateProposedFields(config, proposedValues, { forUpdate: action === "update" });
   if (!validation.ok) {
     const parts = [];

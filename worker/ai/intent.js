@@ -40,6 +40,7 @@ Field meanings:
 - filters: a flat object of simple field:value filters mentioned (e.g. {"country":"Rwanda"} or {"status":"published"}). Keep this small and literal -- do not guess values that weren't stated.
 - fields: for create/update requests only -- the exact field:value pairs the admin wants written, using the real field names listed above. Do not include a field the admin didn't mention. Never invent a value.
 - requestedFields: for read requests where the admin asked about specific fields only (e.g. "show me the current rating") -- the field names, or [] to return the normal summary.
+- For create/update requests, NEVER set clarificationNeeded just because fields are missing or unspecified: put whatever the admin stated in "fields" (even if empty) and the server will report exactly which required fields are missing.
 - clarificationNeeded: a short question to ask the admin, ONLY if the request is genuinely too ambiguous to proceed (e.g. two different resources could match, or a record wasn't identified for an update). Otherwise null.
 
 Never resolve or assume a tenant id, a database id, a permission decision, or a default value the admin didn't state. Those are the server's job, not yours.`;

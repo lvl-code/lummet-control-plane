@@ -166,6 +166,18 @@ describe("Phase 2 end-to-end: preview -> confirm -> execute (real crypto/signing
     assert.equal(fetchLog.length, 0);
   });
 
+  test("TENANT MISMATCH: a preview targeting a tenant other than the active one is refused up front", async () => {
+    const resolved = await resolveAction(env, superAdmin, { resource: "casinos", operation: "create", tenantHint: null });
+    const elsewhere = { ...superAdmin, activeTenantId: "some-other-tenant" };
+    const preview = await buildWritePreview(env, elsewhere, resolved, {
+      operation: "create",
+      fields: { slug: "x", name: "X", affiliate_url: "https://a.example", website_url: "https://x.example" }
+    });
+    assert.equal(preview.ok, false);
+    assert.equal(preview.error, "active_tenant_mismatch");
+    assert.equal(fetchLog.length, 0);
+  });
+
   test("DELETE: destructive preview flags itself, confirm removes the record", async () => {
     const resolved = await resolveAction(env, superAdmin, { resource: "casinos", operation: "delete", tenantHint: null });
     const preview = await buildWritePreview(env, superAdmin, resolved, { operation: "delete", recordId: "level-casino", fields: {} });
