@@ -10,6 +10,8 @@ import { parseIntent } from "./intent.js";
 import { runAction } from "./action-engine.js";
 import { parseCommandLine, resolveCommandIntent, renderHelp } from "./commands.js";
 import { runAgent } from "./agent.js";
+import { getOwnedPendingOperation, isExpired } from "./pending-operations.js";
+import { getTenant } from "../data.js";
 
 export async function createConversation(env, adminId, tenantId, title = null) {
   const id = crypto.randomUUID();
@@ -243,4 +245,61 @@ export async function handleChatMessage(env, admin, { conversationId, message })
   await appendMessage(env, convId, "assistant", replyText, result.pendingOperationId || null);
 
   return { ok: true, conversationId: convId, intent, result, reply: replyText };
+}
+
+/**
+ * When a conversation is reopened, a write preview would otherwise come
+ * back as plain text with no Confirm button. For each message that links
+ * to a pending operation, attach enough state to rebuild the card --
+ * but only to the FIRST message per operation (the preview itself); the
+ * later "Write completed" message shares the same action_id and must
+ * stay plain text. Only operations owned by this admin are attached, and
+ * the real status is included so the UI can show "executed"/"expired"
+ * instead of a live Confirm button. Confirming still goes through
+ * confirm.js, which re-verifies everything -- this is display only.
+ */
+export async function attachPendingPreviews(env, admin, messages) {
+  const seen = new Set();
+  const out = [];
+  for (const m of messages) {
+    if (!m.action_id || seen.has(m.action_id)) {
+      out.push(m);
+      continue;
+    }
+    seen.add(m.action_id);
+    const op = await getOwnedPendingOperation(env, admin, m.action_id);
+    if (!op) {
+      out.push(m);
+      continue;
+    }
+    const tenant = await getTenant(env, op.tenant_id);
+    const proposed = op.proposedValues || {};
+    const current = op.currentValues || {};
+    const isDelete = op.operation === "delete";
+    const changes = isDelete
+      ? []
+      : Object.keys(proposed).map((field) => ({
+          field,
+          current: op.operation === "create" ? null : current[field] ?? null,
+          proposed: proposed[field]
+        }));
+    const state = op.status !== "pending" ? op.status : isExpired(op) ? "expired" : "pending";
+    out.push({
+      ...m,
+      pending: {
+        kind: "write_preview",
+        pendingOperationId: op.id,
+        payloadHash: op.payload_hash,
+        state,
+        tenant: { id: op.tenant_id, name: tenant ? tenant.name : op.tenant_id },
+        resourceKey: op.resource,
+        operation: op.operation,
+        recordId: op.record_id,
+        destructive: isDelete,
+        changes,
+        recordSnapshot: isDelete ? op.currentValues : undefined
+      }
+    });
+  }
+  return out;
 }

@@ -49,6 +49,13 @@ describe("worker/views/pages/ai-chat.js", () => {
     assert.match(html, /\(reason: /);
   });
 
+  test("history loader rebuilds preview cards from m.pending and shows non-pending states", async () => {
+    const admin = { id: 1, role: "super_admin", email: "a@test.local", activeTenantId: TENANT_A };
+    const html = await renderAiChatPage(env, admin);
+    assert.match(html, /if \(m\.pending\) aiRenderWritePreview\(m\.pending, m\.pending\.state\)/);
+    assert.match(html, /Already executed\./);
+  });
+
   test("the AI Chat nav link is present and points at /ai", async () => {
     const admin = { id: 1, role: "super_admin", email: "a@test.local", activeTenantId: TENANT_A };
     const html = await renderAiChatPage(env, admin);

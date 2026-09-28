@@ -157,7 +157,7 @@ export async function renderAiChatPage(env, admin) {
         document.getElementById("ai-messages").appendChild(el);
       }
 
-      function aiRenderWritePreview(result) {
+      function aiRenderWritePreview(result, state) {
         const wrap = document.createElement("div");
         wrap.className = "ai-preview-card" + (result.destructive ? " destructive" : "");
 
@@ -190,6 +190,11 @@ export async function renderAiChatPage(env, admin) {
 
         wrap.dataset.pendingOperationId = result.pendingOperationId;
         wrap.dataset.payloadHash = result.payloadHash;
+        // A card rebuilt from history may no longer be actionable.
+        if (state && state !== "pending") {
+          const labels = { executed: "Already executed.", expired: "Expired — ask again for a fresh preview.", superseded: "Superseded — the record changed; ask again.", rejected: "Was rejected — nothing changed." };
+          wrap.querySelector(".ai-preview-actions").outerHTML = '<div class="ai-preview-resolved">' + aiEscapeHtml(labels[state] || ("Status: " + state)) + '</div>';
+        }
         document.getElementById("ai-messages").appendChild(wrap);
       }
 
@@ -286,7 +291,8 @@ export async function renderAiChatPage(env, admin) {
             messagesEl.innerHTML = '<div class="empty">No messages yet.</div>';
           } else {
             for (const m of data.data.messages) {
-              aiRenderMessage(m.role === "user" ? "user" : "assistant", m.content);
+              if (m.pending) aiRenderWritePreview(m.pending, m.pending.state);
+              else aiRenderMessage(m.role === "user" ? "user" : "assistant", m.content);
             }
           }
         } catch (e) {

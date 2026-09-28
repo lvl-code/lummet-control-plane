@@ -122,7 +122,7 @@ import {
 } from "./views/pages/ai-tools.js";
 import { renderNewsletterPage, submitAddSubscriber, submitUnsubscribe } from "./views/pages/newsletter.js";
 import { renderAiChatPage } from "./views/pages/ai-chat.js";
-import { handleChatMessage, listConversations, getOwnedConversation, getMessages } from "./ai/chat.js";
+import { handleChatMessage, listConversations, getOwnedConversation, getMessages, attachPendingPreviews } from "./ai/chat.js";
 import { confirmPendingOperation } from "./ai/confirm.js";
 import { runHealthChecks, pruneOldAuditLogs } from "./cron.js";
 import { getCmsResourceConfig } from "./cms-resources.js";
@@ -1257,7 +1257,7 @@ export default {
         if (method === "GET" && aiConversationParams) {
           const conversation = await getOwnedConversation(env, admin, aiConversationParams.id);
           if (!conversation) return json({ success: false, error: "not_found" }, 404);
-          const messages = await getMessages(env, conversation.id);
+          const messages = await attachPendingPreviews(env, admin, await getMessages(env, conversation.id));
           return json({ success: true, data: { conversation, messages } });
         }
 
