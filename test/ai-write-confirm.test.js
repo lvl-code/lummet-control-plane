@@ -133,7 +133,7 @@ describe("Phase 2 end-to-end: preview -> confirm -> execute (real crypto/signing
     const resolved = await resolveAction(env, superAdmin, { resource: "casinos", operation: "create", tenantHint: null });
     const preview = await buildWritePreview(env, superAdmin, resolved, {
       operation: "create",
-      fields: { slug: "new-casino", name: "New Casino", affiliate_url: "https://aff.example/new" }
+      fields: { slug: "new-casino", name: "New Casino", affiliate_url: "https://aff.example/new", website_url: "https://new.example" }
     });
     assert.equal(preview.ok, true);
 
@@ -151,6 +151,18 @@ describe("Phase 2 end-to-end: preview -> confirm -> execute (real crypto/signing
     });
     assert.equal(preview.ok, false);
     assert.equal(preview.error, "missing_required_fields");
+    assert.equal(fetchLog.length, 0);
+  });
+
+  test("CREATE without website_url is refused at preview (it is NOT NULL on the tenant), before any tenant call", async () => {
+    const resolved = await resolveAction(env, superAdmin, { resource: "casinos", operation: "create", tenantHint: null });
+    const preview = await buildWritePreview(env, superAdmin, resolved, {
+      operation: "create",
+      fields: { slug: "no-site", name: "No Site", affiliate_url: "https://aff.example/x" }
+    });
+    assert.equal(preview.ok, false);
+    assert.equal(preview.error, "missing_required_fields");
+    assert.match(preview.message, /website_url/);
     assert.equal(fetchLog.length, 0);
   });
 
@@ -312,7 +324,7 @@ describe("Phase 2 end-to-end: preview -> confirm -> execute (real crypto/signing
     const resolved = await resolveAction(env, superAdmin, { resource: "casinos", operation: "create", tenantHint: null });
     const preview = await buildWritePreview(env, superAdmin, resolved, {
       operation: "create",
-      fields: { slug: "dup-casino", name: "Dup", affiliate_url: "https://aff.example/dup" }
+      fields: { slug: "dup-casino", name: "Dup", affiliate_url: "https://aff.example/dup", website_url: "https://dup.example" }
     });
     assert.equal(preview.ok, true);
 

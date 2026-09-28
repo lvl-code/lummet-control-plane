@@ -67,7 +67,12 @@ export const RESOURCES = {
       { name: "slug", label: "Slug", type: "text", required: true },
       { name: "name", label: "Name", type: "text", required: true },
       { name: "affiliate_url", label: "Affiliate URL", type: "text", required: true },
-      { name: "website_url", label: "Website URL", type: "text" },
+      // website_url is NOT NULL in the tenant's casinos table (schema.sql), so
+      // it must be required here too. It was previously optional, which meant a
+      // create that omitted it (dashboard form left blank, or the AI chat) was
+      // accepted by this side and then rejected by D1 with
+      // "NOT NULL constraint failed: casinos.website_url".
+      { name: "website_url", label: "Website URL", type: "text", required: true },
       { name: "logo", label: "Logo URL", type: "text" },
       { name: "rating", label: "Rating", type: "number", step: "0.1" },
       { name: "bonus_title", label: "Bonus title", type: "text" },
