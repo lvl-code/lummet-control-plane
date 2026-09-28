@@ -1018,7 +1018,7 @@ export default {
         }
 
         if (method === "POST" && path === "/api/postback-configs") {
-          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          const guard = (await requirePermission("tenant", "postback_configs", "create")) || (await requireActiveTenantAccess());
           if (guard) return guard;
           const payload = await request.json().catch(() => ({}));
           const result = await submitCreatePostbackConfig(env, admin, payload);
@@ -1035,7 +1035,7 @@ export default {
 
         const updatePostbackParams = matchPath("/api/postback-configs/:id", path);
         if (method === "PUT" && updatePostbackParams) {
-          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          const guard = (await requirePermission("tenant", "postback_configs", "update")) || (await requireActiveTenantAccess());
           if (guard) return guard;
           const payload = await request.json().catch(() => ({}));
           const result = await submitUpdatePostbackConfig(env, admin, updatePostbackParams.id, payload);
@@ -1051,7 +1051,7 @@ export default {
         }
 
         if (method === "DELETE" && updatePostbackParams) {
-          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          const guard = (await requirePermission("tenant", "postback_configs", "delete")) || (await requireActiveTenantAccess());
           if (guard) return guard;
           const result = await submitArchivePostbackConfig(env, admin, updatePostbackParams.id);
           await logAudit(env, {
@@ -1067,7 +1067,7 @@ export default {
 
         const rotatePostbackParams = matchPath("/api/postback-configs/:id/rotate-token", path);
         if (method === "POST" && rotatePostbackParams) {
-          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          const guard = (await requirePermission("tenant", "postback_configs", "update")) || (await requireActiveTenantAccess());
           if (guard) return guard;
           const result = await submitRotatePostbackToken(env, admin, rotatePostbackParams.id);
           await logAudit(env, {
@@ -1082,7 +1082,7 @@ export default {
         }
 
         if (method === "POST" && path === "/api/provider-adapters") {
-          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          const guard = (await requirePermission("tenant", "postback_configs", "create")) || (await requireActiveTenantAccess());
           if (guard) return guard;
           const payload = await request.json().catch(() => ({}));
           const result = await submitCreateProviderAdapter(env, admin, payload);
@@ -1099,7 +1099,7 @@ export default {
 
         const updateAdapterParams = matchPath("/api/provider-adapters/:id", path);
         if (method === "PUT" && updateAdapterParams) {
-          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          const guard = (await requirePermission("tenant", "postback_configs", "update")) || (await requireActiveTenantAccess());
           if (guard) return guard;
           const payload = await request.json().catch(() => ({}));
           const result = await submitUpdateProviderAdapter(env, admin, updateAdapterParams.id, payload);
@@ -1115,7 +1115,7 @@ export default {
         }
 
         if (method === "DELETE" && updateAdapterParams) {
-          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          const guard = (await requirePermission("tenant", "postback_configs", "delete")) || (await requireActiveTenantAccess());
           if (guard) return guard;
           const result = await submitArchiveProviderAdapter(env, admin, updateAdapterParams.id);
           await logAudit(env, {
@@ -1180,9 +1180,8 @@ export default {
         }
 
         // ---- Editorial AI Tools ----
-        // super-admin only (same boundary as postback-configs/
-        // provider-adapters above) rather than the ordinary
-        // permission matrix -- see ai-tools.js header for why.
+        // Gated by the "ai_tools" resource in the permission matrix
+        // (super admins always pass via hasPermission).
         const AI_TOOL_ROUTES = {
           "/api/ai/generate-review": submitGenerateReview,
           "/api/ai/generate-seo": submitGenerateSeoCopy,
@@ -1193,7 +1192,7 @@ export default {
           "/api/ai/suggest-links": submitSuggestInternalLinks
         };
         if (method === "POST" && Object.prototype.hasOwnProperty.call(AI_TOOL_ROUTES, path)) {
-          const guard = requireSuperAdmin() || (await requireActiveTenantAccess());
+          const guard = (await requirePermission("tenant", "ai_tools", "read")) || (await requireActiveTenantAccess());
           if (guard) return guard;
           const payload = await request.json().catch(() => ({}));
           const result = await AI_TOOL_ROUTES[path](env, admin, payload);
@@ -1869,19 +1868,6 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
     return isJsonRoute ? forbiddenJson() : forbiddenHtml();
   }
 
-  // Local equivalent of the outer fetch()'s requireSuperAdmin() (line
-  // ~459) -- that one is a closure over that function's own scope and
-  // isn't reachable here (handleResourceRoutes is a sibling top-level
-  // function, not nested inside fetch()). Calling the outer name from
-  // here throws a ReferenceError, which the outer fetch()'s try/catch
-  // then swallows into a generic "Something went wrong." 500 -- which
-  // is exactly what was happening on every request to /content/integrations
-  // and /content/ai-tools, the only two routes in this function that
-  // use this guard instead of checkResourcePermission().
-  function requireSuperAdmin() {
-    return isSuperAdmin(admin) ? null : forbiddenHtml();
-  }
-
   if (section === "system") {
     if (method === "GET" && path === "/system/settings") {
       const guard = await checkResourcePermission("settings", "read", false);
@@ -1960,7 +1946,7 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
     if (method === "GET" && path === "/content/analytics") {
       const guard = await checkResourcePermission("analytics", "read", false);
       if (guard) return guard;
-      return html(await renderAnalyticsPage(env, admin, Object.fromEntries(url.searchParams)));
+      return html(await renderAnalyticsPage(env, admin, Object.fromEntries(new URL(request.url).searchParams)));
     }
 
     if (method === "GET" && path === "/content/seo") {
@@ -1970,13 +1956,13 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
     }
 
     if (method === "GET" && path === "/content/integrations") {
-      const guard = requireSuperAdmin();
+      const guard = await checkResourcePermission("postback_configs", "read", false);
       if (guard) return guard;
       return html(await renderIntegrationsPage(env, admin));
     }
 
     if (method === "GET" && path === "/content/ai-tools") {
-      const guard = requireSuperAdmin();
+      const guard = await checkResourcePermission("ai_tools", "read", false);
       if (guard) return guard;
       return html(await renderAiToolsPage(env, admin));
     }
