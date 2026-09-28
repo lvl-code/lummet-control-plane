@@ -54,8 +54,14 @@ const NAV = [
       { label: "Country Pages", href: "/content/country-pages", key: "content-country-pages", area: "tenant", resource: "seo_pages" },
       { label: "Category Countries", href: "/content/category-countries", key: "content-category-countries", area: "tenant", resource: "seo_pages" },
       { label: "SEO Meta", href: "/content/seo", key: "content-seo", area: "tenant", resource: "seo" },
-      { label: "Integrations", href: "/content/integrations", key: "content-integrations", area: "tenant", resource: "postback_configs" },
-      { label: "AI Tools", href: "/content/ai-tools", key: "content-ai-tools", area: "tenant", resource: "ai_tools" },
+      // Both routes are gated requireSuperAdmin() in index.js, not the
+      // ordinary permission matrix (see integrations.js/ai-tools.js
+      // headers for why) -- superAdminOnly here keeps the nav link
+      // itself honest about that: without it, a staff admin who was
+      // ever granted a "read" row on postback_configs/ai_tools via
+      // /system/permissions would see a link that 403s every time.
+      { label: "Integrations", href: "/content/integrations", key: "content-integrations", area: "tenant", resource: "postback_configs", superAdminOnly: true },
+      { label: "AI Tools", href: "/content/ai-tools", key: "content-ai-tools", area: "tenant", resource: "ai_tools", superAdminOnly: true },
       { label: "Support", href: "/content/support", key: "content-support", area: "tenant", resource: "inquiries" },
       { label: "Newsletter", href: "/content/newsletter", key: "content-newsletter", area: "tenant", resource: "newsletter" },
       { label: "Affiliate Partners", href: "/content/affiliate-partners", key: "content-affiliate-partners", area: "tenant", resource: "affiliate-partners" },
@@ -297,6 +303,7 @@ function renderNav(activeKey, permMap, isSuper) {
     if (section.superAdminOnly && !isSuper) return null;
 
     const visibleItems = section.items.filter((item) => {
+      if (item.superAdminOnly && !isSuper) return false; // e.g. Integrations/AI Tools — route itself is requireSuperAdmin(), regardless of any resource grant
       if (!item.area) return true; // e.g. Dashboard/Overview — always visible
       if (permMap === null) return true; // super admin sentinel
       return !!permMap?.[item.area]?.[item.resource]?.read;

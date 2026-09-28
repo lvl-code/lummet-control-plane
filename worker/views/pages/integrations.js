@@ -185,6 +185,17 @@ export async function renderIntegrationsPage(env, admin) {
     </div>
 
     <script>
+      // Same path the tenant's own admin (postback-config-admin.js)
+      // builds the full postback URL from -- worker/postback/handler.js
+      // serves it at this path on the tenant's own origin, not
+      // lummet.com. Needed so a config created/rotated here is
+      // actually usable: unlike every other field, endpoint_token is
+      // never shown again after this (see postback-configs.js), so
+      // silently reloading the page after create/rotate -- as this
+      // page used to -- left no way to retrieve it afterward short of
+      // rotating again.
+      const POSTBACK_URL_BASE = ${JSON.stringify(tenant.api_base_url || "")} + "/en/api/v1/conversions/postback/";
+
       async function integrationApi(method, path, body) {
         const opts = { method, headers: { "Content-Type": "application/json" } };
         if (body !== undefined) opts.body = JSON.stringify(body);
@@ -224,6 +235,9 @@ export async function renderIntegrationsPage(env, admin) {
           ? await integrationApi("PUT", "/api/postback-configs/" + id, payload)
           : await integrationApi("POST", "/api/postback-configs", payload);
         if (!data.success) { alert("Could not save: " + (data.message || data.error || "unknown error")); return; }
+        if (!id && data.data && data.data.endpoint_token) {
+          alert("Integration created. Postback URL: " + POSTBACK_URL_BASE + data.data.endpoint_token + " — copy this now, it won't be shown in full again.");
+        }
         location.reload();
       });
 
@@ -236,7 +250,7 @@ export async function renderIntegrationsPage(env, admin) {
           if (!confirm("Rotate this postback's endpoint token? The old URL will stop working immediately.")) return;
           const data = await integrationApi("POST", "/api/postback-configs/" + rotatePb.dataset.rotatePostback + "/rotate-token");
           if (!data.success) { alert("Could not rotate: " + (data.message || data.error || "unknown error")); return; }
-          alert("New token: " + (data.data && data.data.endpoint_token));
+          alert("New postback URL: " + POSTBACK_URL_BASE + (data.data && data.data.endpoint_token));
           location.reload();
           return;
         }

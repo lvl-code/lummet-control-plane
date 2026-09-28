@@ -1869,6 +1869,19 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
     return isJsonRoute ? forbiddenJson() : forbiddenHtml();
   }
 
+  // Local equivalent of the outer fetch()'s requireSuperAdmin() (line
+  // ~459) -- that one is a closure over that function's own scope and
+  // isn't reachable here (handleResourceRoutes is a sibling top-level
+  // function, not nested inside fetch()). Calling the outer name from
+  // here throws a ReferenceError, which the outer fetch()'s try/catch
+  // then swallows into a generic "Something went wrong." 500 -- which
+  // is exactly what was happening on every request to /content/integrations
+  // and /content/ai-tools, the only two routes in this function that
+  // use this guard instead of checkResourcePermission().
+  function requireSuperAdmin() {
+    return isSuperAdmin(admin) ? null : forbiddenHtml();
+  }
+
   if (section === "system") {
     if (method === "GET" && path === "/system/settings") {
       const guard = await checkResourcePermission("settings", "read", false);
