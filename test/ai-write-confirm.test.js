@@ -307,4 +307,32 @@ describe("Phase 2 end-to-end: preview -> confirm -> execute (real crypto/signing
     assert.equal(preview.error, "invalid_fields");
     assert.equal(fetchLog.length, 0);
   });
+
+  test("TENANT REJECTION: the tenant's real reason survives client.js -> crud.js -> confirm.js, not just the generic masked message", async () => {
+    const resolved = await resolveAction(env, superAdmin, { resource: "casinos", operation: "create", tenantHint: null });
+    const preview = await buildWritePreview(env, superAdmin, resolved, {
+      operation: "create",
+      fields: { slug: "dup-casino", name: "Dup", affiliate_url: "https://aff.example/dup" }
+    });
+    assert.equal(preview.ok, true);
+
+    // The tenant now rejects the create with a specific 422 reason.
+    const baseMock = globalThis.fetch;
+    globalThis.fetch = async (url, options) => {
+      const u = new URL(url);
+      if (u.pathname === "/en/api/super/casinos" && (options?.method || "GET") === "POST") {
+        return { ok: false, status: 422, json: async () => ({ success: false, error: "slug_already_exists" }) };
+      }
+      return baseMock(url, options);
+    };
+
+    const confirmed = await confirmPendingOperation(env, superAdmin, preview.pendingOperationId, preview.payloadHash);
+    assert.equal(confirmed.ok, false);
+    // Generic masked message is still what `message` says...
+    assert.match(confirmed.message, /rejected this input as invalid/i);
+    // ...but the tenant's actual reason is preserved in `error` so the chat can show it.
+    assert.equal(confirmed.error, "slug_already_exists");
+    // And nothing was created.
+    assert.equal(tenantDb.casinos["dup-casino"], undefined);
+  });
 });

@@ -74,6 +74,20 @@ describe("ai/chat.js formatResultAsText", () => {
     assert.match(text, /casinos, reviews/);
   });
 
+  test("a failure whose machine code differs from its message shows the code as a reason", () => {
+    const text = formatResultAsText(
+      {},
+      { ok: false, error: "slug_already_exists", message: "The tenant rejected this input as invalid." }
+    );
+    assert.match(text, /rejected this input as invalid/);
+    assert.match(text, /\(reason: slug_already_exists\)/);
+  });
+
+  test("no reason line is added when there is no code, or when code and message are identical", () => {
+    assert.doesNotMatch(formatResultAsText({}, { ok: false, message: "Nope." }), /reason:/);
+    assert.doesNotMatch(formatResultAsText({}, { ok: false, error: "same", message: "same" }), /reason:/);
+  });
+
   test("a schema result lists every field", () => {
     const text = formatResultAsText(
       {},

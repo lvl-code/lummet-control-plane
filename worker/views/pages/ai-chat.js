@@ -216,7 +216,9 @@ export async function renderAiChatPage(env, admin) {
           if (data.success) {
             actions.outerHTML = '<div class="ai-preview-resolved" style="color:var(--ok);">Write completed.</div>';
           } else {
-            actions.outerHTML = '<div class="ai-preview-resolved" style="color:#ff8fa3;">' + aiEscapeHtml(data.message || data.error || "The write failed.") + '</div>';
+            let failText = data.message || data.error || "The write failed.";
+            if (data.error && data.error !== data.message) failText += " (reason: " + data.error + ")";
+            actions.outerHTML = '<div class="ai-preview-resolved" style="color:#ff8fa3;">' + aiEscapeHtml(failText) + '</div>';
           }
         } catch (e) {
           actions.outerHTML = '<div class="ai-preview-resolved" style="color:#ff8fa3;">Could not reach the server.</div>';

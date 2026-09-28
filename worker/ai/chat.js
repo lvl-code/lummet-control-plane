@@ -74,6 +74,19 @@ export async function appendMessage(env, conversationId, role, content, actionId
 export function formatResultAsText(intent, result) {
   if (!result.ok) {
     let text = result.message || "That request could not be completed.";
+    // `result.error` is a short machine code set by resolver.js/read.js/
+    // write.js/confirm.js -- for our own errors (e.g. "forbidden",
+    // "unknown_resource") it's redundant with `message` but harmless to
+    // show; for a live tenant rejection (client.js's messageForStatus,
+    // deliberately generic to avoid letting an untrusted caller
+    // fingerprint which check failed) it's the ONLY place the tenant's
+    // actual reason (e.g. a duplicate-slug error thrown by the tenant's
+    // own handler) survives to this point. The admin using this chat is
+    // already authenticated and permission-checked, so showing them the
+    // real reason costs nothing and saves a lot of guessing.
+    if (result.error && result.error !== result.message) {
+      text += `\n(reason: ${result.error})`;
+    }
     if (result.available) text += `\n\nAvailable resources: ${result.available.join(", ")}`;
     if (result.candidates) {
       text += `\n\n${result.candidates.map((c) => `- ${c.name} (${c.host})`).join("\n")}`;

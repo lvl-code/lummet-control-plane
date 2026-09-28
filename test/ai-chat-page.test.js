@@ -43,6 +43,12 @@ describe("worker/views/pages/ai-chat.js", () => {
     assert.match(html, /id="ai-composer"/);
   });
 
+  test("the confirm-failure handler surfaces the tenant's reason, not only the generic message", async () => {
+    const admin = { id: 1, role: "super_admin", email: "a@test.local", activeTenantId: TENANT_A };
+    const html = await renderAiChatPage(env, admin);
+    assert.match(html, /\(reason: /);
+  });
+
   test("the AI Chat nav link is present and points at /ai", async () => {
     const admin = { id: 1, role: "super_admin", email: "a@test.local", activeTenantId: TENANT_A };
     const html = await renderAiChatPage(env, admin);
