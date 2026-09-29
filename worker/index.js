@@ -105,7 +105,8 @@ import {
   submitNewsroomMeta,
   submitNewsroomRelations
 } from "./views/pages/newsroom-tags.js";
-import { renderReportsPage, submitCreateReport, submitRunReport } from "./views/pages/reports.js";
+import { renderReportsPage, submitCreateReport, submitRunReport, fetchReportColumnOptions } from "./views/pages/reports.js";
+import { submitAnalyticsRun } from "./views/pages/analytics.js";
 import { renderAlertsPage, submitCreateAlertRule, submitAcknowledgeAlert } from "./views/pages/alerts.js";
 import { renderAnalyticsPage } from "./views/pages/analytics.js";
 import { renderSeoMetaPage, submitSaveSeoMeta, submitDeleteSeoMeta } from "./views/pages/seo-meta.js";
@@ -943,6 +944,34 @@ export default {
 
           if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
           return json({ success: true, data: result.data?.data });
+        }
+
+        if (method === "GET" && path === "/api/reports/column-options") {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "reports", "read"));
+          if (guard) return guard;
+          const reportType = new URL(request.url).searchParams.get("report_type") || "";
+          const result = await fetchReportColumnOptions(env, admin, reportType);
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data?.data });
+        }
+
+        const analyticsRunParams = matchPath("/api/analytics/:kind", path);
+        if (method === "POST" && analyticsRunParams) {
+          const guard = (await requireActiveTenantAccess()) || (await requirePermission("tenant", "analytics", "create"));
+          if (guard) return guard;
+          const payload = await request.json().catch(() => ({}));
+          const result = await submitAnalyticsRun(env, admin, analyticsRunParams.kind, payload);
+
+          await logAudit(env, {
+            adminId: admin.id, tenantId: admin.activeTenantId, endpoint: path, method,
+            resource: "analytics_run", resourceId: analyticsRunParams.kind, action: "run",
+            success: result.ok, statusCode: result.ok ? 200 : result.status || 400,
+            errorMessage: result.ok ? null : result.message || result.error || result.reason,
+            requestId, ipHash
+          });
+
+          if (!result.ok) return json({ success: false, error: result.reason, message: result.message }, result.status || 400);
+          return json({ success: true, data: result.data });
         }
 
         if (method === "POST" && path === "/api/alert-rules") {

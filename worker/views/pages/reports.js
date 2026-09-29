@@ -61,7 +61,7 @@ export async function renderReportsPage(env, admin) {
       <td><code>${escapeHtml(r.report_type)}</code></td>
       <td>${escapeHtml(r.owner_id ?? "")}</td>
       <td>
-        <button type="button" class="btn btn-small" data-run-report="${r.id}">Run…</button>
+        <button type="button" class="btn btn-small" data-run-report="${r.id}" data-report-type="${escapeHtml(r.report_type)}">Run…</button>
       </td>
     </tr>`;
 
@@ -101,7 +101,11 @@ export async function renderReportsPage(env, admin) {
         <label>Start date<input type="date" id="runStartDate" /></label>
         <label>End date<input type="date" id="runEndDate" /></label>
         <label>Currency <span style="color:var(--text-dim);font-weight:normal;">(optional)</span><input type="text" id="runCurrency" placeholder="USD" style="width:90px;" /></label>
+        <label>Group by <span style="color:var(--text-dim);font-weight:normal;">(optional)</span>
+          <select id="runGroupBy"><option value="">— none —</option></select>
+        </label>
       </div>
+      <div id="runColumnPicker" style="margin-top:10px;"></div>
       <button type="button" class="btn btn-small" id="runReportBtn" style="margin-top:8px;">Run now</button>
       <div id="runReportOutput" style="margin-top:14px;overflow-x:auto;"></div>
     </div>
@@ -125,22 +129,53 @@ export async function renderReportsPage(env, admin) {
         location.reload();
       });
 
+      let runReportType = null;
+
+      async function loadColumnOptions(reportType) {
+        const picker = document.getElementById("runColumnPicker");
+        const groupSel = document.getElementById("runGroupBy");
+        groupSel.innerHTML = "<option value=\"\">— none —</option>";
+        picker.innerHTML = "Loading columns…";
+        const res = await fetch("/api/reports/column-options?report_type=" + encodeURIComponent(reportType));
+        const data = await res.json().catch(() => ({}));
+        const columns = data.success ? (data.data || []) : [];
+        if (!columns.length) { picker.innerHTML = "<p style=\"font-size:12px;color:var(--text-dim);\">Column selection not available for this report type — it will show every column.</p>"; return; }
+        picker.innerHTML = "<div style=\"font-size:12px;color:var(--text-dim);margin-bottom:4px;\">Columns (unchecked = leave out; none checked = all columns)</div>" +
+          "<div style=\"display:flex;gap:10px;flex-wrap:wrap;\">" +
+          columns.map((c) => "<label style=\"font-weight:400;\"><input type=\"checkbox\" class=\"run-col\" value=\"" + c.key + "\" checked /> " + (c.label || c.key) + "</label>").join("") +
+          "</div>";
+        columns.filter((c) => c.groupable).forEach((g) => {
+          const opt = document.createElement("option");
+          opt.value = g.key; opt.textContent = g.label || g.key;
+          groupSel.appendChild(opt);
+        });
+      }
+
       document.body.addEventListener("click", (e) => {
         const runBtn = e.target.closest("[data-run-report]");
         if (!runBtn) return;
         runReportId = runBtn.dataset.runReport;
+        runReportType = runBtn.dataset.reportType || null;
         document.getElementById("runReportName").textContent = "#" + runReportId;
         document.getElementById("runReportOutput").innerHTML = "";
         document.getElementById("runReportCard").style.display = "block";
         document.getElementById("runReportCard").scrollIntoView({ behavior: "smooth" });
+        if (runReportType) loadColumnOptions(runReportType);
       });
 
       document.getElementById("runReportBtn").addEventListener("click", async () => {
         const startDate = document.getElementById("runStartDate").value;
         const endDate = document.getElementById("runEndDate").value;
         const currency = document.getElementById("runCurrency").value.trim();
+        const groupBy = document.getElementById("runGroupBy").value;
+        const checked = Array.from(document.querySelectorAll(".run-col:checked")).map((el) => el.value);
+        const allBoxes = document.querySelectorAll(".run-col").length;
+        const selectedColumns = checked.length && checked.length < allBoxes ? checked : undefined;
         if (!startDate || !endDate) { alert("Pick a start and end date."); return; }
-        const data = await reportApi("/api/reports/" + runReportId + "/run", { startDate, endDate, currency: currency || undefined });
+        const data = await reportApi("/api/reports/" + runReportId + "/run", {
+          startDate, endDate, currency: currency || undefined,
+          selectedColumns, groupBy: groupBy || undefined
+        });
         if (!data.success) { alert("Could not run: " + (data.message || data.error || "unknown error")); return; }
         const { columns, rows } = data.data || {};
         const out = document.getElementById("runReportOutput");
@@ -149,7 +184,8 @@ export async function renderReportsPage(env, admin) {
         out.innerHTML = "<table class=\\"table\\"><thead><tr>" +
           cols.map((c) => "<th>" + c + "</th>").join("") +
           "</tr></thead><tbody>" +
-          rows.map((r) => "<tr>" + cols.map((c) => "<td>" + (r[c] ?? "") + "</td>").join("") + "</tr>").join("") +
+          rows.map((r) => "<tr" + (r.is_subtotal ? " style=\\"font-weight:600;background:var(--panel-alt);\\"" : "") + ">" +
+            cols.map((c) => "<td>" + (r[c] ?? "") + "</td>").join("") + "</tr>").join("") +
           "</tbody></table>";
       });
     </script>
@@ -173,4 +209,12 @@ export async function submitRunReport(env, admin, id, payload) {
   const tenant = await resolveTenantOrNull(env, admin);
   if (!tenant) return { ok: false, status: 422, reason: "no_active_tenant" };
   return postToTenant(env, tenant, `${BASE_PATH}/reports/${encodeURIComponent(id)}/run`, payload);
+}
+
+// Feeds the run panel's column-picker/group-by controls (GET, read-only —
+// no audit entry, same as any other list/read call in this codebase).
+export async function fetchReportColumnOptions(env, admin, reportType) {
+  const tenant = await resolveTenantOrNull(env, admin);
+  if (!tenant) return { ok: false, status: 422, reason: "no_active_tenant" };
+  return getFromTenant(env, tenant, `${BASE_PATH}/report-column-options?report_type=${encodeURIComponent(reportType)}`);
 }
