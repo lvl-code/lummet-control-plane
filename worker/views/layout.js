@@ -95,6 +95,9 @@ const NAV = [
       { label: "Publications", href: "/cms/publications", key: "cms-publications", area: "cms", resource: "publications" },
       { label: "Advertisements", href: "/cms/advertisements", key: "cms-advertisements", area: "cms", resource: "advertisements" },
       { label: "Homepage sections", href: "/cms/homepage_sections", key: "cms-homepage-sections", area: "cms", resource: "homepage_sections" },
+      { label: "Features", href: "/cms/features", key: "cms-features", area: "cms", resource: "features" },
+      { label: "FAQs", href: "/cms/faqs", key: "cms-faqs", area: "cms", resource: "faqs" },
+      { label: "Navigation links", href: "/cms/nav_links", key: "cms-nav-links", area: "cms", resource: "nav_links" },
       { label: "Homepage settings", href: "/cms/settings", key: "cms-site-settings", area: "cms", resource: "site_settings" }
     ]
   },

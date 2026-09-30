@@ -143,6 +143,10 @@ export async function deleteCmsRecord(env, resourceKey, id) {
 
 export const SITE_SETTING_KEYS = [
   "site_name",
+  "site_title",
+  "site_description",
+  "canonical_url",
+  "og_image",
   "logo_url",
   "accent_color",
   "accent_color_secondary",
@@ -154,7 +158,15 @@ export const SITE_SETTING_KEYS = [
   "hero_cta_secondary_label",
   "hero_cta_secondary_href",
   "contact_email",
-  "footer_text"
+  "footer_text",
+  "brands_title",
+  "brands_intro",
+  "updates_title",
+  "updates_intro",
+  "insights_title",
+  "insights_intro",
+  "partners_title",
+  "partners_intro"
 ];
 
 export async function getSiteSettings(env) {

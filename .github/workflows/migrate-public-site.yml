@@ -1,0 +1,55 @@
+name: Migrate Lummet Control Plane DB (public site, manual)
+
+# Manual only. Applies migrations 0006 and 0007 to the REMOTE D1 database,
+# after exporting a backup. 0006 is skipped if it is already applied (it uses
+# ALTER TABLE ADD COLUMN, which cannot be run twice); 0007 is idempotent.
+# Needs a CLOUDFLARE_API_TOKEN secret that is allowed to edit D1.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DB: lummet-control-plane-db
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Wrangler
+        run: npm install -g wrangler
+
+      - name: Back up the remote database
+        run: wrangler d1 export "$DB" --remote --output=backup-before-public-site.sql
+
+      - name: Keep the backup (private to this repository)
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-backup-before-public-site
+          path: backup-before-public-site.sql
+          retention-days: 30
+
+      - name: Apply 0006 (only if not applied yet)
+        run: |
+          wrangler d1 execute "$DB" --remote --json --command "PRAGMA table_info(lummet_brands)" > cols.json
+          if python3 -c "import json,sys; d=json.load(open('cols.json')); sys.exit(0 if any(r.get('name')=='category' for b in d for r in b.get('results',[])) else 1)"; then
+            echo "0006 already applied, skipping"
+          else
+            wrangler d1 execute "$DB" --remote --file=migrations/0006_public_site_schema.sql
+          fi
+
+      - name: Apply 0007 (safe to re-run)
+        run: wrangler d1 execute "$DB" --remote --file=migrations/0007_seed_lummet_content.sql
+
+      - name: Show what is now published
+        run: |
+          wrangler d1 execute "$DB" --remote --command "SELECT (SELECT COUNT(*) FROM lummet_brands WHERE status='published') AS brands, (SELECT COUNT(*) FROM lummet_updates WHERE status='published') AS updates, (SELECT COUNT(*) FROM lummet_publications WHERE status='published') AS insights, (SELECT COUNT(*) FROM lummet_pages WHERE status='published') AS pages"

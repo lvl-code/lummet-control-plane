@@ -18,11 +18,14 @@
 //   POST /api/tenants/:id/switch   (sets active tenant on session)
 //   DELETE /api/session/active-tenant  (clears active tenant on session)
 //
-// Public marketing site (unauthenticated):
+// Public marketing site (unauthenticated, rendered from D1 by
+// worker/public-site/, templates + assets in public/):
 //   GET  /            (public homepage for anonymous visitors;
 //                       signed-in admins see the dashboard instead)
-//   GET  /privacy
-//   GET  /terms
+//   GET  /brands, /brands/:slug, /updates, /updates/:slug,
+//        /insights, /insights/:slug, /partners, /authors/:slug
+//   GET  /p/:slug, /about, /security, /privacy, /terms
+//   GET  /sitemap.xml, /robots.txt, /static/*
 //
 // Dashboard pages (Phase 4, new):
 //   GET/POST /login
@@ -54,7 +57,7 @@ import { isSuperAdmin, canAccessTenant, hasPermission, setPermission, setTenantA
 
 import { renderLoginPage } from "./views/pages/login.js";
 import { renderDashboardHome } from "./views/pages/dashboard.js";
-import { renderPublicHomepage, renderPublicStaticPage, renderPublicCmsPage } from "./views/pages/home.js";
+import { handlePublicRoute } from "./public-site/router.js";
 import {
   renderTenantsList,
   renderAddTenantForm,
@@ -372,47 +375,20 @@ export default {
       // linked from the homepage footer.
       // ---------------------------------------------
 
-      if (method === "GET" && path === "/") {
-        const maybeAdmin = await auth.getCurrentAdmin(request, env);
-        if (!maybeAdmin) {
-          return html(await renderPublicHomepage(env, { contactEmail: env.CONTACT_EMAIL || null }));
-        }
-        // Signed in — fall through to the authenticated dashboard route below.
-      }
-
-      // /p/:slug — a Lummet-managed standalone page created from
-      // /cms/pages in the dashboard (see cms.js). Public and
-      // unauthenticated, same audience as "/" above. Falls through
-      // to the normal 404 below if there's no published page there.
+      // The public site lives in worker/public-site/ (router.js). It
+      // owns "/", /brands, /updates, /insights, /partners, /authors/:slug,
+      // /p/:slug, /about /security /privacy /terms, /sitemap.xml,
+      // /robots.txt and /static/*. It returns null for any path it does not
+      // own, and for "/" when an admin is signed in, so the authenticated
+      // dashboard route below is reached exactly as before.
       {
-        const pageParams = method === "GET" ? matchPath("/p/:slug", path) : null;
-        if (pageParams) {
-          const rendered = await renderPublicCmsPage(env, pageParams.slug);
-          if (rendered) return html(rendered);
-          // fall through to 404 further down
-        }
-      }
-
-      if (method === "GET" && path === "/privacy") {
-        return html(
-          renderPublicStaticPage({
-            title: "Privacy",
-            heading: "Privacy",
-            bodyText:
-              "This page will describe how Lummet handles data for the platform and its connected brands. Full privacy documentation is coming soon."
-          })
-        );
-      }
-
-      if (method === "GET" && path === "/terms") {
-        return html(
-          renderPublicStaticPage({
-            title: "Terms",
-            heading: "Terms",
-            bodyText:
-              "This page will describe the terms of use for the Lummet platform. Full terms documentation is coming soon."
-          })
-        );
+        const publicResponse = await handlePublicRoute({
+          request,
+          env,
+          ctx,
+          isAdmin: async () => Boolean(await auth.getCurrentAdmin(request, env))
+        });
+        if (publicResponse) return publicResponse;
       }
 
       // ---------------------------------------------

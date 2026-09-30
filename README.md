@@ -275,20 +275,17 @@ content:
   tenant CRUD screens (`renderRichTextField` from `crud.js`), plus a
   dedicated `/cms/settings` screen for the homepage's hero
   copy/CTAs/footer/contact email.
-- **`home.js`'s homepage is now dynamic**: hero eyebrow/title/
-  subtitle/CTA labels+links, footer text, and contact email all pull
-  from `lummet_site_settings`, falling back to the original hardcoded
-  copy if a field hasn't been set yet (so a fresh deploy, or one
-  before migration 0002 has run, never renders broken/empty). Added
-  a live **Updates** section and **Partners** section pulling
-  published rows, and an ad-banner slot for the `homepage_banner`
-  placement.
-- **`/p/:slug`** — a new public route that renders a published
-  `lummet_pages` row (e.g. an About page created from
-  `/cms/pages/new`). Unpublished/draft pages 404.
+- **The public website is fully database-driven** (Phase 11 replaced
+  the original hardcoded `home.js` and `public-brands.js`): see
+  [`docs/PUBLIC_SITE.md`](docs/PUBLIC_SITE.md). Templates live in
+  `public/templates/`, CSS/JS in `public/static/`, and the renderer in
+  `worker/public-site/`.
+- **`/p/:slug`** and the clean aliases `/about`, `/security`,
+  `/privacy`, `/terms` render a published `lummet_pages` row.
+  Unpublished/draft pages 404.
 - Nav gained a **"Lummet Site"** section: Pages, Authors, Brand
   profiles, Partners, Updates, Publications, Advertisements, and
-  Homepage settings.
+  Homepage settings, Features, FAQs and Navigation links.
 
 ### Phase 10 — Lummet staff accounts & permissions
 
@@ -398,6 +395,29 @@ add more without editing code.
   branding actually appearing on the rendered homepage and `/p/:slug`
   pages, the CSS-injection guard on the color fields, and draft vs.
   published visibility for homepage sections.
+
+### Phase 11 — Database-driven public website
+
+The public site (`/`, `/brands`, `/updates`, `/insights`, `/partners`,
+`/authors/:slug`, `/about`, `/security`, `/privacy`, `/terms`, `/p/:slug`,
+`/sitemap.xml`, `/robots.txt`) is now rendered from D1 through a shared
+`base.html` + `header.html` + `footer.html` layout, organised like the tenant
+(`public/templates`, `public/static/{css,js,images}`, `worker/public-site/`).
+
+- **Migrations:** `0006_public_site_schema.sql` (run once; adds brand
+  `category`, per-page SEO columns, homepage section kinds, and the
+  `lummet_features`, `lummet_nav_links`, `lummet_faqs` tables) and
+  `0007_seed_lummet_content.sql` (real starting content, safe to re-run).
+- **Removed:** `worker/views/pages/home.js` and `worker/public-brands.js`
+  (hardcoded homepage and brand list).
+- **Admin:** Lummet Site gains Features, FAQs and Navigation links; brands,
+  pages, updates and publications gain SEO / social-image fields.
+- **Docs:** [`docs/PUBLIC_SITE.md`](docs/PUBLIC_SITE.md) (architecture, rules,
+  how to add content) and
+  [`docs/INTEGRATION_PUBLIC_SITE.md`](docs/INTEGRATION_PUBLIC_SITE.md)
+  (Termux integration, deployment and rollback commands).
+- **Deploy order matters:** pushing to `main` deploys the Worker but does not
+  run migrations, so apply 0006 then 0007 to the remote D1 **before** pushing.
 
 ## Deployment
 

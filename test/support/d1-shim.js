@@ -92,6 +92,43 @@ export function createTestDb() {
   };
 }
 
+
+/**
+ * Splits a migration file into statements the way SQLite would:
+ * `--` line comments and `;` only count OUTSIDE single-quoted string
+ * literals ('' is an escaped quote). This matters for seed files whose
+ * text values legitimately contain semicolons and apostrophes.
+ */
+export function splitSqlStatements(rawSql) {
+  const statements = [];
+  let current = '';
+  let inString = false;
+  for (let i = 0; i < rawSql.length; i++) {
+    const ch = rawSql[i];
+    if (inString) {
+      current += ch;
+      if (ch === "'") {
+        if (rawSql[i + 1] === "'") { current += "'"; i++; } else { inString = false; }
+      }
+      continue;
+    }
+    if (ch === "'") { inString = true; current += ch; continue; }
+    if (ch === '-' && rawSql[i + 1] === '-') {
+      while (i < rawSql.length && rawSql[i] !== '\n') i++;
+      current += '\n';
+      continue;
+    }
+    if (ch === ';') {
+      if (current.trim()) statements.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) statements.push(current.trim());
+  return statements;
+}
+
 /**
  * Runs every migration file in /migrations, in filename order,
  * against a fresh test DB — so tests run against the REAL
@@ -109,13 +146,8 @@ export function applyMigrations(testDb) {
 
   for (const file of ordered) {
     const rawSql = readFileSync(join(MIGRATIONS_DIR, file), 'utf-8');
-    const sql = rawSql.split('\n').map(line => {
-      const idx = line.indexOf('--');
-      return idx === -1 ? line : line.slice(0, idx);
-    }).join('\n');
 
-    const statements = sql.split(';').map(s => s.trim()).filter(Boolean);
-    for (const statement of statements) {
+    for (const statement of splitSqlStatements(rawSql)) {
       try {
         testDb._exec(statement + ';');
       } catch (e) {

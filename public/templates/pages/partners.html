@@ -1,0 +1,16 @@
+<section class="page-hero">
+  <div class="container">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li><span aria-current="page">Partners</span></li></ol></nav>
+    <h1>{{title}}</h1>
+    {{#if intro}}<p class="lede">{{intro}}</p>{{/if}}
+  </div>
+</section>
+<section class="section section-tight">
+  <div class="container">
+    {{#if partners}}
+    <div class="grid grid-3">{{#each partners}}{{> components/partner-card}}{{/each}}</div>
+    {{else}}
+    <div class="empty-state"><p>No partners are listed yet.</p>{{#if site.has_contact}}<a class="btn btn-secondary" href="mailto:{{site.contact_email}}">Talk to us about partnering</a>{{/if}}</div>
+    {{/if}}
+  </div>
+</section>

@@ -153,7 +153,20 @@ wrangler d1 execute lummet-control-plane-db --file=migrations/0001_control_plane
 wrangler d1 execute lummet-control-plane-db --file=migrations/0002_lummet_cms.sql --remote
 wrangler d1 execute lummet-control-plane-db --file=migrations/0003_lummet_admin_rbac.sql --remote
 wrangler d1 execute lummet-control-plane-db --file=migrations/0004_lummet_homepage_sections.sql --remote
+wrangler d1 execute lummet-control-plane-db --file=migrations/0005_lummet_ai_management.sql --remote
+wrangler d1 execute lummet-control-plane-db --file=migrations/0006_public_site_schema.sql --remote
+wrangler d1 execute lummet-control-plane-db --file=migrations/0007_seed_lummet_content.sql --remote
 ```
+
+`0006` makes the public website database-driven (brand category, per-page
+SEO columns, homepage section kinds, and the `lummet_features`,
+`lummet_nav_links` and `lummet_faqs` tables). It uses `ALTER TABLE ADD
+COLUMN`, so **run it exactly once** per database. `0007` seeds the real
+starting content and is **safe to re-run**: every row is `INSERT OR IGNORE`
+against a unique key, so it never duplicates or overwrites an admin edit.
+Run `0006` before `0007`, and both before deploying this version of the
+Worker, because the public pages read those tables. See
+`docs/PUBLIC_SITE.md`.
 
 `0002` adds Lummet's own CMS tables (pages, authors, brands,
 partners, updates, publications, advertisements, homepage settings).
@@ -162,8 +175,8 @@ sections table (Phase 9.1). All three are additive — safe to run on
 an existing deployment that only has `0001` applied, and the
 homepage/nav code falls back gracefully if a later migration hasn't
 run yet (new nav sections/CMS just won't have anywhere to write, and
-`renderPublicHomepage` catches the failure and falls back to its
-built-in defaults). Run `0002`/`0003` before granting any staff
+the public site shows a "temporarily unavailable" page instead of
+rendering from tables that do not exist yet). Run `0002`/`0003` before granting any staff
 account access, though — until `0003` is applied, every
 non-bootstrap admin account creation will fail since
 `lummet_admins.status` doesn't exist yet.

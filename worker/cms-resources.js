@@ -30,14 +30,15 @@ export const CMS_RESOURCES = {
     ],
     orderBy: "title",
     fields: [
-      { name: "slug", label: "Slug", type: "text", required: true, hint: "lummet.com/p/<slug>" },
+      { name: "slug", label: "Slug", type: "text", required: true, hint: "lummet.com/p/<slug>; about, security, privacy and terms are served at /<slug>" },
       { name: "title", label: "Title", type: "text", required: true },
       { name: "excerpt", label: "Excerpt", type: "textarea" },
       { name: "content", label: "Content", type: "richtext" },
       { name: "author_id", label: "Author", type: "resource_select", optionsResource: "authors" },
       { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
       { name: "seo_title", label: "SEO title", type: "text" },
-      { name: "seo_description", label: "SEO description", type: "textarea" }
+      { name: "seo_description", label: "SEO description", type: "textarea" },
+      { name: "og_image", label: "Social share image URL", type: "text", hint: "1200x630 recommended" }
     ]
   },
 
@@ -72,13 +73,17 @@ export const CMS_RESOURCES = {
     fields: [
       { name: "name", label: "Name", type: "text", required: true },
       { name: "slug", label: "Slug", type: "text", required: true },
+      { name: "category", label: "Category", type: "text", hint: "e.g. iGaming & Casino Intelligence. Used for the filter on /brands" },
       { name: "tagline", label: "Tagline", type: "text" },
       { name: "description", label: "Description", type: "richtext" },
       { name: "logo_url", label: "Logo URL", type: "text" },
       { name: "website_url", label: "Website URL", type: "text" },
       { name: "tenant_id", label: "Linked tenant (optional)", type: "tenant_select" },
       { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
-      { name: "sort_order", label: "Sort order", type: "number" }
+      { name: "sort_order", label: "Sort order", type: "number" },
+      { name: "seo_title", label: "SEO title", type: "text" },
+      { name: "seo_description", label: "SEO description", type: "textarea" },
+      { name: "og_image", label: "Social share image URL", type: "text", hint: "1200x630 recommended" }
     ]
   },
 
@@ -120,7 +125,10 @@ export const CMS_RESOURCES = {
       { name: "author_id", label: "Author", type: "resource_select", optionsResource: "authors" },
       { name: "featured_image", label: "Featured image URL", type: "text" },
       { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
-      { name: "published_at", label: "Published at", type: "text", hint: "ISO date, optional" }
+      { name: "published_at", label: "Published at", type: "text", hint: "ISO date, optional" },
+      { name: "seo_title", label: "SEO title", type: "text" },
+      { name: "seo_description", label: "SEO description", type: "textarea" },
+      { name: "og_image", label: "Social share image URL", type: "text", hint: "1200x630 recommended" }
     ]
   },
 
@@ -144,7 +152,10 @@ export const CMS_RESOURCES = {
       { name: "author_id", label: "Author", type: "resource_select", optionsResource: "authors" },
       { name: "featured_image", label: "Featured image URL", type: "text" },
       { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
-      { name: "published_at", label: "Published at", type: "text", hint: "ISO date, optional" }
+      { name: "published_at", label: "Published at", type: "text", hint: "ISO date, optional" },
+      { name: "seo_title", label: "SEO title", type: "text" },
+      { name: "seo_description", label: "SEO description", type: "textarea" },
+      { name: "og_image", label: "Social share image URL", type: "text", hint: "1200x630 recommended" }
     ]
   },
 
@@ -180,6 +191,10 @@ export const CMS_RESOURCES = {
     ],
     orderBy: "sort_order, title",
     fields: [
+      { name: "section_key", label: "Section key", type: "text", required: true, hint: "Anchor id, e.g. brands -> /#brands. Lowercase letters, numbers, dashes" },
+      { name: "kind", label: "Kind", type: "select", options: ["text", "features", "steps", "checklist", "panel", "brands", "stats", "updates", "insights", "partners", "faq", "cta", "contact"], hint: "Which component renders this section. Data-driven kinds (brands, updates, insights, partners, stats) hide themselves when there is nothing published" },
+      { name: "feature_group", label: "Feature group", type: "text", hint: "For features / steps / checklist / panel: which Features group to show. For faq: which FAQ group" },
+      { name: "background", label: "Background", type: "select", options: ["default", "soft", "dark"] },
       { name: "title", label: "Title", type: "text", required: true },
       { name: "subtitle", label: "Subtitle / eyebrow", type: "text" },
       { name: "body", label: "Body", type: "richtext" },
@@ -188,7 +203,63 @@ export const CMS_RESOURCES = {
       { name: "cta_label", label: "Button label", type: "text" },
       { name: "cta_href", label: "Button link", type: "text" },
       { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
-      { name: "sort_order", label: "Sort order", type: "number", hint: "lower shows first, after the built-in Updates/Partners sections" }
+      { name: "sort_order", label: "Sort order", type: "number", hint: "lower shows first" }
+    ]
+  },
+  features: {
+    label: "Features",
+    table: "lummet_features",
+    listColumns: [
+      { key: "title", label: "Title" },
+      { key: "group_key", label: "Group" },
+      { key: "status", label: "Status" }
+    ],
+    orderBy: "group_key, sort_order, title",
+    fields: [
+      { name: "feature_key", label: "Key", type: "text", required: true, hint: "Unique, e.g. cap-monitoring" },
+      { name: "group_key", label: "Group", type: "text", required: true, hint: "platform, how_it_works, capabilities, why, ai, or your own; referenced by a homepage section's Feature group" },
+      { name: "icon", label: "Icon", type: "select", options: ["", "check", "plug", "sliders", "trending", "layers", "sparkles", "file-text", "search", "map-pin", "share", "activity", "eye", "message", "lock", "shield", "key", "database", "globe", "cpu", "zap", "clock", "users"] },
+      { name: "title", label: "Title", type: "text", required: true },
+      { name: "body", label: "Body", type: "textarea" },
+      { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
+      { name: "sort_order", label: "Sort order", type: "number" }
+    ]
+  },
+
+  nav_links: {
+    label: "Navigation links",
+    table: "lummet_nav_links",
+    listColumns: [
+      { key: "label", label: "Label" },
+      { key: "placement", label: "Placement" },
+      { key: "status", label: "Status" }
+    ],
+    orderBy: "placement, sort_order, label",
+    fields: [
+      { name: "placement", label: "Placement", type: "select", options: ["header", "header_cta", "footer_platform", "footer_company", "footer_legal"], required: true },
+      { name: "label", label: "Label", type: "text", required: true },
+      { name: "href", label: "Link", type: "text", required: true, hint: "/brands, /#faq, https://..., mailto:..." },
+      { name: "visible_when", label: "Show when", type: "select", options: ["always", "has_brands", "has_updates", "has_publications", "has_partners", "has_faq", "has_contact"], hint: "Hides the link until its destination has published content. For a page link use always and only publish the page" },
+      { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
+      { name: "sort_order", label: "Sort order", type: "number" }
+    ]
+  },
+
+  faqs: {
+    label: "FAQs",
+    table: "lummet_faqs",
+    listColumns: [
+      { key: "question", label: "Question" },
+      { key: "group_key", label: "Group" },
+      { key: "status", label: "Status" }
+    ],
+    orderBy: "group_key, sort_order, id",
+    fields: [
+      { name: "group_key", label: "Group", type: "text", required: true, hint: "general" },
+      { name: "question", label: "Question", type: "text", required: true },
+      { name: "answer", label: "Answer", type: "richtext", required: true },
+      { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
+      { name: "sort_order", label: "Sort order", type: "number" }
     ]
   }
 };

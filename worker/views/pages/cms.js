@@ -201,6 +201,18 @@ export async function submitCmsDelete(env, resourceKey, id) {
 
 const SETTING_LABELS = {
   site_name: "Site name",
+  site_title: "Homepage <title>",
+  site_description: "Default meta description",
+  canonical_url: "Canonical site URL",
+  og_image: "Default social share image URL",
+  brands_title: "/brands page title",
+  brands_intro: "/brands page intro",
+  updates_title: "/updates page title",
+  updates_intro: "/updates page intro",
+  insights_title: "/insights page title",
+  insights_intro: "/insights page intro",
+  partners_title: "/partners page title",
+  partners_intro: "/partners page intro",
   logo_url: "Logo image URL",
   accent_color: "Primary accent color",
   accent_color_secondary: "Secondary accent color",
@@ -217,6 +229,8 @@ const SETTING_LABELS = {
 
 const SETTING_HINTS = {
   site_name: 'Shown next to the logo, e.g. "Lummet". Leave blank to keep "Lummet".',
+  canonical_url: "Full origin used for canonical links, Open Graph URLs and the sitemap, e.g. https://lummet.com. Blank uses the address the visitor arrived on.",
+  contact_email: "Shown in the footer and the Get in Touch section. If blank, the CONTACT_EMAIL Worker variable is used; if neither is set, contact blocks are hidden.",
   logo_url: "Shown in the header instead of the dot icon. Leave blank to use the default mark.",
   accent_color: "Hex color, e.g. #6d5bf6. Leave blank for the default purple.",
   accent_color_secondary: "Hex color used for gradients alongside the primary accent."
@@ -227,7 +241,7 @@ export async function renderSiteSettingsPage(env, admin, flash) {
   const settings = await getSiteSettings(env);
 
   const fieldsHtml = SITE_SETTING_KEYS.map((key) => {
-    const isLong = key === "hero_subtitle" || key === "footer_text";
+    const isLong = ["hero_subtitle", "footer_text", "site_description", "brands_intro", "updates_intro", "insights_intro", "partners_intro"].includes(key);
     const hint = SETTING_HINTS[key];
     return `<div class="form-group">
       <label>${escapeHtml(SETTING_LABELS[key] || key)}${hint ? ` <span style="color:var(--text-dim);font-weight:400;">— ${escapeHtml(hint)}</span>` : ""}</label>
@@ -239,7 +253,7 @@ export async function renderSiteSettingsPage(env, admin, flash) {
 
   const body = `
     <h1>Homepage &amp; site settings</h1>
-    <p class="subtitle">Lummet Site · Site settings — edits the branding and copy shown on lummet.com's public site. Leave a field blank to fall back to the built-in default.</p>
+    <p class="subtitle">Lummet Site · Site settings — edits the branding and copy shown on lummet.com's public site. Leave a field blank to hide that piece of copy. Changes appear within about a minute (edge cache).</p>
     ${flashHtml(flash)}
     <form method="POST" action="/cms/settings" class="card">
       <h3 style="margin-top:0;">Branding</h3>
@@ -253,7 +267,7 @@ export async function renderSiteSettingsPage(env, admin, flash) {
       <h3>Homepage copy</h3>
       ${SITE_SETTING_KEYS.filter((k) => !["site_name", "logo_url", "accent_color", "accent_color_secondary"].includes(k))
         .map((key) => {
-          const isLong = key === "hero_subtitle" || key === "footer_text";
+          const isLong = ["hero_subtitle", "footer_text", "site_description", "brands_intro", "updates_intro", "insights_intro", "partners_intro"].includes(key);
           return `<div class="form-group">
             <label>${escapeHtml(SETTING_LABELS[key] || key)}</label>
             ${isLong

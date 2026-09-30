@@ -5,6 +5,17 @@
   "compatibility_date": "2026-01-01",
   "compatibility_flags": ["nodejs_compat"],
 
+  // Public website assets: templates (public/templates/**) are read by the
+  // Worker through this binding; only /static/* is ever served to visitors
+  // (worker/public-site/router.js), so templates are never exposed as URLs.
+  // run_worker_first keeps every request going through the Worker, which is
+  // required because "/" is shared with the authenticated dashboard.
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./public",
+    "run_worker_first": true
+  },
+
   // Bind this Worker's own, independent D1 database.
   // This database holds ONLY control-plane metadata:
   // the tenant registry, encrypted credential references,
@@ -44,11 +55,11 @@
   //                     if needed.
   //
   // Optional vars:
-  //   CONTACT_EMAIL   — if set, shown on the public homepage's
-  //                     "Get in Touch" section as a mailto link.
-  //                     Left unset by default; the public site
-  //                     shows a neutral fallback instead of an
-  //                     invented address until this is configured.
+  //   CONTACT_EMAIL   — fallback contact address for the public site.
+  //                     The `contact_email` site setting (Lummet Site ->
+  //                     Homepage settings) takes precedence. If neither is
+  //                     set, the contact section, footer address and
+  //                     "Contact" links are simply not rendered.
   //
   // Routes / custom domain for the master hostname are configured
   // separately in the Cloudflare dashboard or via `routes` here.
