@@ -1,6 +1,6 @@
 <section class="page-hero">
   <div class="container">
-    <nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li><span aria-current="page">Updates</span></li></ol></nav>
+    {{> components/breadcrumbs}}
     <h1>{{title}}</h1>
     {{#if intro}}<p class="lede">{{intro}}</p>{{/if}}
   </div>
@@ -15,14 +15,14 @@
         <a class="card post-card" href="{{url}}">
           <h3>{{title}}</h3>
           {{#if excerpt}}<p>{{excerpt}}</p>{{/if}}
-          <span class="card-cta">Read update {{{icons.arrow}}}</span>
+          <span class="card-cta">{{ui.read_update}} {{{icons.arrow}}}</span>
         </a>
       </li>
       {{/each}}
     </ol>
     {{> components/pagination}}
     {{else}}
-    <div class="empty-state"><p>No updates have been published yet.</p></div>
+    <div class="empty-state"><p>{{ui.empty_updates}}</p></div>
     {{/if}}
   </div>
 </section>

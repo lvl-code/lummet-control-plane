@@ -4,7 +4,8 @@
       {{#if eyebrow}}<span class="eyebrow">{{eyebrow}}</span>{{/if}}
       <h2>{{title}}</h2>
       {{#if body_html}}<div class="lede prose">{{{body_html}}}</div>{{/if}}
-      <a class="btn btn-primary btn-lg" href="mailto:{{site.contact_email}}">Email {{site.contact_email}}</a>
+      {{#if cta_label}}<a class="btn btn-primary btn-lg" href="{{cta_href}}">{{cta_label}} {{{icons.arrow}}}</a>{{/if}}
+      {{#if site.has_contact}}<p class="contact-mail"><a href="mailto:{{site.contact_email}}">{{site.contact_email}}</a></p>{{/if}}
     </div>
   </div>
 </section>

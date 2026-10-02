@@ -162,12 +162,21 @@ test('a section with no published rows does not render (no placeholder copy)', a
   assert.doesNotMatch(html, /hero-graph/);
 });
 
-test('contact blocks disappear when no contact email is configured', async () => {
+test('with no contact email, no mailto link appears anywhere; the contact form still works', async () => {
   const env = createPublicEnv({ contactEmail: '' });
+  let html = await text(await get(handlePublicRoute, env, '/'));
+  assert.doesNotMatch(html, /mailto:/);
+  assert.match(html, /id="contact"/); // the section links to the /contact form instead
+  assert.match(html, /href="\/contact"/);
+});
+
+test('with no contact email AND no published contact form, the contact section and its links disappear', async () => {
+  const env = createPublicEnv({ contactEmail: '' });
+  await env.db.prepare(`UPDATE lummet_forms SET status = 'draft' WHERE form_key = 'contact'`).run();
   const html = await text(await get(handlePublicRoute, env, '/'));
   assert.doesNotMatch(html, /id="contact"/);
   assert.doesNotMatch(html, /mailto:/);
-  assert.doesNotMatch(html, /Get a Demo/); // the primary CTA targets #demo -> #contact, which is absent
+  assert.doesNotMatch(html, /href="\/contact"/);
 });
 
 test('hero CTAs never point at a section that is not on the page', async () => {

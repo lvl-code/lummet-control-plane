@@ -6,6 +6,7 @@
 import * as data from "./data.js";
 import { xmlEscape } from "./format.js";
 import { pageCanonicalPath } from "./pages.js";
+import { formPath } from "./forms.js";
 import { textResponse } from "./render.js";
 
 const day = (v) => (v ? String(v).slice(0, 10) : "");
@@ -15,13 +16,14 @@ export async function sitemapXml(ctx) {
   const { site, counts } = siteCtx;
   const base = site.base_url;
 
-  const [brands, updates, publications, pages, authors, partners] = await Promise.all([
+  const [brands, updates, publications, pages, authors, partners, publishedForms] = await Promise.all([
     data.listBrands(env, 500),
     data.listUpdates(env, { limit: 500 }),
     data.listPublications(env, { limit: 500 }),
     data.listPublishedPages(env),
     data.listAuthorsWithPublishedWork(env),
-    counts.partners ? data.listPartners(env, 1) : Promise.resolve([])
+    counts.partners ? data.listPartners(env, 1) : Promise.resolve([]),
+    data.listPublishedForms(env)
   ]);
 
   const urls = [{ loc: `${base}/` }];
@@ -33,6 +35,7 @@ export async function sitemapXml(ctx) {
   for (const p of publications) urls.push({ loc: `${base}/insights/${p.slug}`, lastmod: day(p.updated_at || p.published_at) });
   if (partners.length) urls.push({ loc: `${base}/partners` });
   for (const pg of pages) urls.push({ loc: `${base}${pageCanonicalPath(pg.slug)}`, lastmod: day(pg.updated_at) });
+  for (const f of publishedForms) urls.push({ loc: `${base}${formPath(f.form_key)}`, lastmod: day(f.updated_at) });
   for (const a of authors) urls.push({ loc: `${base}/authors/${a.slug}`, lastmod: day(a.updated_at) });
 
   const body = urls

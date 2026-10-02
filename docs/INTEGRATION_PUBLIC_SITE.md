@@ -12,15 +12,23 @@ Files you download into `~/storage/downloads`:
 
 > The zip and patch are **files** in `~/storage/downloads`, not a folder. There is no `lummet/` folder there to `cd` into.
 
+> **Read this first: pick exactly ONE way to apply.**
+> Section 1 only compares (read-only). Then **A (script), B (patch) and C (manual copy) are three
+> alternatives that do the same thing.** Do one of them, never two. If you run a second one after the
+> first has worked, it fails with "already exists in working directory" / "patch does not apply".
+> That is expected and harmless: `git apply` is all-or-nothing, so a failed run changes nothing.
+
 ## 0. One-time setup in Termux
 
 ```bash
-termux-setup-storage            # allow storage access (once)
-pkg install -y unzip git diffutils coreutils nodejs
-ls ~/storage/downloads | grep -E 'public-site'
+ls ~/storage/downloads | grep public-site      # if this fails, run: termux-setup-storage
+pkg install -y unzip git diffutils coreutils
+node -v                                        # need Node 22 or newer for npm test
+# Only if node is missing: pkg install nodejs-lts
+# (installing "nodejs" while "nodejs-lts" is present REPLACES your LTS with the current release)
 ```
 
-## 1. Unzip into a staging folder and compare (changes nothing)
+## 1. Unzip into a staging folder and compare (read-only)
 
 ```bash
 cd ~/lummet
@@ -38,7 +46,9 @@ diff -u lummet-control-plane/worker/index.js compare-upgrades/public-site/lummet
 Expected: 9 modified files, 70 files only in the new tree (they appear as a few whole directories), 2 files only in yours
 (the obsolete ones). Full list at the bottom.
 
-Shortcut that does steps 1, 3 and 4 safely (Termux has no /tmp, so everything stays under ~/lummet), including a check that your files are
+## 2A. Apply with the script (recommended)
+
+Does the unzip, a check that your files are
 still the versions this change was built on:
 
 ```bash
@@ -50,7 +60,7 @@ bash compare-upgrades/_tools/lummet-control-plane/docs/integration/integrate.sh 
 bash compare-upgrades/_tools/lummet-control-plane/docs/integration/integrate.sh apply
 ```
 
-## 2. Dry-run with the patch (alternative to copying)
+## 2B. Apply with the patch (ALTERNATIVE to 2A and 2C: skip if you already applied)
 
 ```bash
 cd ~/lummet/lummet-control-plane
@@ -60,7 +70,7 @@ git apply --check ~/storage/downloads/public-site.patch && echo "applies cleanly
 git apply         ~/storage/downloads/public-site.patch
 ```
 
-## 3. Manual copy (alternative to the script)
+## 2C. Apply by manual copy (ALTERNATIVE to 2A and 2B: skip if you already applied)
 
 ```bash
 cd ~/lummet
@@ -92,14 +102,14 @@ done
 cd $DST && git rm worker/public-brands.js worker/views/pages/home.js
 ```
 
-## 4. Test locally
+## 3. Test locally
 
 ```bash
 cd ~/lummet/lummet-control-plane
 npm test          # expect fail 0. "pass 314" with lummet-tenant next to it (as in ~/lummet), 299 without
 ```
 
-## 5. Database migrations: BEFORE you push
+## 4. Database migrations: BEFORE you push
 
 Pushing to `main` runs `wrangler deploy` (see `.github/workflows/deploy.yml`) but
 **does not run migrations**. Until 0006 and 0007 are applied, the public pages
@@ -119,14 +129,14 @@ wrangler d1 execute lummet-control-plane-db --remote --file=migrations/0006_publ
 wrangler d1 execute lummet-control-plane-db --remote --file=migrations/0007_seed_lummet_content.sql
 ```
 
-Option B: GitHub Actions (no wrangler on the phone). Commit and push first (step 6),
+Option B: GitHub Actions (no wrangler on the phone). Commit and push first (section 5),
 accept a short window where public pages show the unavailable message, then in GitHub:
 **Actions -> "Migrate Lummet Control Plane DB (public site, manual)" -> Run workflow**.
 It exports a backup artifact, skips 0006 if already applied, runs 0007, and prints
 counts. It uses the same two secrets as the deploy workflow; the token must be
 allowed to edit D1. This workflow could not be run here, so check its first run.
 
-## 6. Git
+## 5. Git
 
 ```bash
 cd ~/lummet/lummet-control-plane
@@ -142,7 +152,7 @@ git commit -m "Public site: database-driven pages, shared base/header/footer lay
 git push origin main              # triggers the Worker deploy
 ```
 
-## 7. Verify after deploy
+## 6. Verify after deploy
 
 ```bash
 curl -sI https://lummet.com/ | head -5
@@ -157,7 +167,7 @@ curl -s -o /dev/null -w '/terms %{http_code} (404 until you publish it)\n' https
 Then in the dashboard: Lummet Site -> Pages -> Terms: paste your terms, set
 status = published. Pages appear within about a minute (edge cache).
 
-## 8. Rollback
+## 7. Rollback
 
 ```bash
 cd ~/lummet/lummet-control-plane
@@ -165,7 +175,7 @@ git revert HEAD && git push origin main      # previous Worker code is redeploye
 ```
 
 The migrations are additive and can stay: the previous code ignores the new
-columns and tables. To restore data, import the backup taken in step 5.
+columns and tables. To restore data, import the backup taken in section 4.
 
 ## Change manifest
 

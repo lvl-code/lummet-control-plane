@@ -8,7 +8,7 @@
   function setMenu(open) {
     if (!toggle || !menu) return;
     toggle.setAttribute("aria-expanded", String(open));
-    toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    toggle.setAttribute("aria-label", (open ? toggle.getAttribute("data-label-close") : toggle.getAttribute("data-label-open")) || "");
     menu.hidden = !open;
     document.body.style.overflow = open ? "hidden" : "";
   }

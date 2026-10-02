@@ -19,7 +19,7 @@
 {{#if has_insights}}
 <section class="section section-tight">
   <div class="container">
-    <header class="section-head"><h2>Insights</h2></header>
+    <header class="section-head"><h2>{{ui.author_insights}}</h2></header>
     <div class="grid grid-3">{{#each insights}}{{> components/insight-card}}{{/each}}</div>
   </div>
 </section>
@@ -27,7 +27,7 @@
 {{#if has_updates}}
 <section class="section section-tight bg-soft">
   <div class="container">
-    <header class="section-head"><h2>Updates</h2></header>
+    <header class="section-head"><h2>{{ui.author_updates}}</h2></header>
     <div class="grid grid-3">{{#each updates}}{{> components/update-card}}{{/each}}</div>
   </div>
 </section>

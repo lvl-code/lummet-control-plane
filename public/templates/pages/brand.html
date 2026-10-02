@@ -3,7 +3,7 @@
     {{> components/breadcrumbs}}
     <div class="brand-hero">
       {{#if brand.has_logo}}
-      <img class="brand-hero-logo" src="{{brand.logo_url}}" alt="{{brand.name}} logo" width="88" height="88">
+      <img class="brand-hero-logo" src="{{brand.logo_url}}" alt="{{brand.name}}" width="88" height="88">
       {{else}}
       <span class="brand-initials brand-initials-lg" aria-hidden="true">{{brand.initials}}</span>
       {{/if}}
@@ -15,7 +15,7 @@
     </div>
     {{#if brand.website_url}}
     <div class="hero-actions">
-      <a class="btn btn-primary btn-lg" href="{{brand.website_url}}" target="_blank" rel="noopener noreferrer">Visit {{brand.website_host}} {{{icons.external}}}</a>
+      <a class="btn btn-primary btn-lg" href="{{brand.website_url}}" target="_blank" rel="noopener noreferrer">{{ui.visit_site}} {{brand.website_host}} {{{icons.external}}}</a>
     </div>
     {{/if}}
   </div>
@@ -30,7 +30,7 @@
 {{#if has_related}}
 <section class="section bg-soft">
   <div class="container">
-    <header class="section-head"><h2>More brands</h2></header>
+    <header class="section-head"><h2>{{ui.more_brands}}</h2></header>
     <div class="grid grid-3">
       {{#each related}}{{> components/brand-card}}{{/each}}
     </div>

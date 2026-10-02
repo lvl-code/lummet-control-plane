@@ -1,24 +1,23 @@
 #!/usr/bin/env bash
 # =====================================================================
-# Integrate the "database-driven public site" change into an existing
+# Integrate a packaged change (see docs/integration/baseline.sha256 + removed.txt) into an existing
 # lummet-control-plane checkout (built for Termux, works on any Linux).
 #
 #   bash integrate.sh check   [ZIP] [DEST]   compare only, changes nothing
 #   bash integrate.sh apply   [ZIP] [DEST]   copy new + modified files, remove the 2 obsolete ones
 #
 # Defaults:
-#   ZIP  = ~/storage/downloads/lummet-control-plane-public-site-full.zip
+#   ZIP  = ~/storage/downloads/lummet-control-plane-v3-contact-demo-full.zip
 #   DEST = ~/lummet/lummet-control-plane
 # It never touches .git, .wrangler or node_modules, and never commits.
 # =====================================================================
 set -euo pipefail
 
 MODE="${1:-check}"
-ZIP="${2:-$HOME/storage/downloads/lummet-control-plane-public-site-full.zip}"
+ZIP="${2:-$HOME/storage/downloads/lummet-control-plane-v3-contact-demo-full.zip}"
 DEST="${3:-$HOME/lummet/lummet-control-plane}"
-STAGE="$HOME/lummet/compare-upgrades/public-site"
+STAGE="$HOME/lummet/compare-upgrades/$(basename "$ZIP" .zip)"
 ROOT="lummet-control-plane"
-REMOVED="worker/public-brands.js worker/views/pages/home.js"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -55,7 +54,7 @@ if [ "$BAD" = "1" ] && [ "${FORCE:-0}" != "1" ]; then
   echo "   Compare manually:  diff -u $DEST/<file> $NEW/<file>"
   die "baseline mismatch. Nothing was changed. (FORCE=1 overrides, overwriting your version)"
 fi
-echo "   all 11 baseline files match"
+echo "   all $(wc -l < "$NEW/docs/integration/baseline.sha256" | tr -d " ") baseline files match"
 
 echo "== 4/5 Comparison (your repo  vs  new tree)"
 diff -rq --exclude=.git --exclude=.wrangler --exclude=node_modules "$DEST" "$NEW" | sed "s#$DEST#[yours]#g; s#$NEW#[new]#g" || true
@@ -66,11 +65,13 @@ fi
 
 echo "== 5/5 Applying"
 cp -a "$NEW/." "$DEST/"
-for f in $REMOVED; do
-  if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then git rm -q "$f"; else rm -f "$f"; fi
-  echo "   removed $f"
-done
+if [ -f "$NEW/docs/integration/removed.txt" ]; then
+  while read -r f; do
+    [ -n "$f" ] || continue
+    if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then git rm -q "$f"; echo "   removed $f"; fi
+  done < "$NEW/docs/integration/removed.txt"
+fi
 echo; git status --short | awk '{print $1}' | sort | uniq -c
 echo
 echo "Done. Next: npm test, then apply the D1 migrations, then git add/commit/push."
-echo "See docs/INTEGRATION_PUBLIC_SITE.md"
+echo "See the docs/INTEGRATION_*.md file that shipped with this change."

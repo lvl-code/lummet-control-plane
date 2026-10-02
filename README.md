@@ -417,7 +417,20 @@ The public site (`/`, `/brands`, `/updates`, `/insights`, `/partners`,
   [`docs/INTEGRATION_PUBLIC_SITE.md`](docs/INTEGRATION_PUBLIC_SITE.md)
   (Termux integration, deployment and rollback commands).
 - **Deploy order matters:** pushing to `main` deploys the Worker but does not
-  run migrations, so apply 0006 then 0007 to the remote D1 **before** pushing.
+  run migrations, so apply the migrations to the remote D1 **before** pushing.
+
+### Phase 11.1 — Contact and demo pages, interface text in the database
+
+- `/contact` and `/demo` (and any `/forms/<key>`) are rendered from
+  `lummet_forms` / `lummet_form_fields`; submissions are stored in
+  `lummet_inquiries` and managed under Lummet Site -> Inquiries.
+- Small interface text moved out of templates into `lummet_ui_strings`
+  (Lummet Site -> Interface text). A test fails if literal text reappears in a
+  template.
+- Sticky footer: the footer is always at the bottom of the screen.
+- Buttons and links hide themselves when their destination has nothing published.
+- **Migration:** `0008_contact_demo_forms.sql` (safe to re-run).
+- **Optional secret:** `INQUIRY_WEBHOOK_URL` for a new-inquiry notification.
 
 ## Deployment
 

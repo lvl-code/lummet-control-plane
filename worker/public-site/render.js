@@ -46,11 +46,12 @@ export function textResponse(body, contentType, { status = 200, cacheControl = P
 
 export async function renderPage(ctx, { template, data = {}, head = "", status = 200, bodyClass = "" }) {
   const { env, siteCtx, url } = ctx;
-  const view = { ...data, site: siteCtx.site, icons: siteCtx.icons };
+  const view = { ...data, site: siteCtx.site, icons: siteCtx.icons, ui: siteCtx.ui };
   const content = await renderTemplate(env, `pages/${template}`, view);
   const html = await renderTemplate(env, "layout/base", {
     site: siteCtx.site,
     icons: siteCtx.icons,
+    ui: siteCtx.ui,
     head_html: head,
     content,
     body_class: bodyClass,

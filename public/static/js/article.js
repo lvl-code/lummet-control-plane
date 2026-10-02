@@ -5,7 +5,7 @@
     btn.addEventListener("click", function () {
       navigator.clipboard.writeText(window.location.href.split("#")[0]).then(function () {
         var original = btn.innerHTML;
-        btn.textContent = "Link copied";
+        btn.textContent = btn.getAttribute("data-copied") || "";
         setTimeout(function () { btn.innerHTML = original; }, 1800);
       });
     });

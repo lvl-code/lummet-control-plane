@@ -6,7 +6,7 @@
 // =====================================================
 
 import { escapeHtml } from "./template.js";
-import { truncate } from "./format.js";
+import { truncate, fill } from "./format.js";
 
 const W = 480;
 const H = 400;
@@ -16,13 +16,15 @@ const RX = 150;
 const RY = 112;
 const MAX_NODES = 6;
 
-export function heroGraphSvg(centerName, brands) {
+export function heroGraphSvg(centerName, brands, ui = {}) {
   const nodes = brands.slice(0, MAX_NODES);
   if (!nodes.length) return "";
 
-  const label = `${centerName} control plane connected to ${nodes.length} brand${nodes.length === 1 ? "" : "s"}: ${nodes
-    .map((b) => b.name)
-    .join(", ")}`;
+  const label = fill(nodes.length === 1 ? ui.graph_label_one : ui.graph_label_many, {
+    center: centerName,
+    count: nodes.length,
+    names: nodes.map((b) => b.name).join(", ")
+  });
 
   const points = nodes.map((b, i) => {
     const angle = -Math.PI / 2 + (i * 2 * Math.PI) / nodes.length;

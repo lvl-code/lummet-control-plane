@@ -18,7 +18,7 @@
   {{#if site.accent_css}}<style>{{{site.accent_css}}}</style>{{/if}}
 </head>
 <body class="{{body_class}}">
-  <a class="skip-link" href="#main">Skip to content</a>
+  <a class="skip-link" href="#main">{{ui.skip_to_content}}</a>
   {{> layout/header}}
   <main id="main">
     {{{content}}}
@@ -28,5 +28,6 @@
   <script src="/static/js/reveal.js" defer></script>
   <script src="/static/js/filter.js" defer></script>
   <script src="/static/js/article.js" defer></script>
+  <script src="/static/js/form.js" defer></script>
 </body>
 </html>

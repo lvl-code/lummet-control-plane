@@ -55,7 +55,9 @@ export async function getCmsRecordBySlug(env, resourceKey, slug) {
 
 function coerceValue(field, raw) {
   if (field.type === "number") {
-    if (raw === "" || raw === undefined || raw === null) return null;
+    // A blank number falls back to the field's declared default (columns such as
+    // sort_order are NOT NULL DEFAULT 0, and an explicit NULL would be rejected).
+    if (raw === "" || raw === undefined || raw === null) return field.default ?? null;
     const n = Number(raw);
     return Number.isFinite(n) ? n : null;
   }
@@ -67,9 +69,14 @@ function coerceValue(field, raw) {
   return raw === "" ? null : raw;
 }
 
+/** Fields an admin may write. readOnly fields (e.g. a visitor's submission) are displayed but never saved. */
+function writableFields(config) {
+  return config.fields.filter((f) => !f.readOnly);
+}
+
 function validateAndCoerce(config, form) {
   const values = {};
-  for (const field of config.fields) {
+  for (const field of writableFields(config)) {
     const raw = form[field.name];
     if (field.required && (raw === undefined || String(raw).trim() === "")) {
       return { ok: false, status: 422, error: "validation_error", message: `${field.label} is required.` };
@@ -82,11 +89,12 @@ function validateAndCoerce(config, form) {
 export async function createCmsRecord(env, resourceKey, form) {
   const config = getCmsResourceConfig(resourceKey);
   if (!config) return { ok: false, status: 404, error: "unknown_resource" };
+  if (config.supportsCreate === false) return { ok: false, status: 405, error: "create_not_supported" };
 
   const validated = validateAndCoerce(config, form);
   if (!validated.ok) return validated;
 
-  const columns = config.fields.map((f) => f.name);
+  const columns = writableFields(config).map((f) => f.name);
   const placeholders = columns.map(() => "?").join(", ");
   const binds = columns.map((c) => validated.values[c]);
 
@@ -110,7 +118,7 @@ export async function updateCmsRecord(env, resourceKey, id, form) {
   const validated = validateAndCoerce(config, form);
   if (!validated.ok) return validated;
 
-  const columns = config.fields.map((f) => f.name);
+  const columns = writableFields(config).map((f) => f.name);
   const setClause = columns.map((c) => `${c} = ?`).join(", ");
   const binds = columns.map((c) => validated.values[c]);
   binds.push(id);
@@ -166,7 +174,8 @@ export const SITE_SETTING_KEYS = [
   "insights_title",
   "insights_intro",
   "partners_title",
-  "partners_intro"
+  "partners_intro",
+  "inquiry_rate_limit_per_hour"
 ];
 
 export async function getSiteSettings(env) {

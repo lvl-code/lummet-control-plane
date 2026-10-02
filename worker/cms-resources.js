@@ -80,7 +80,7 @@ export const CMS_RESOURCES = {
       { name: "website_url", label: "Website URL", type: "text" },
       { name: "tenant_id", label: "Linked tenant (optional)", type: "tenant_select" },
       { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
-      { name: "sort_order", label: "Sort order", type: "number" },
+      { name: "sort_order", label: "Sort order", type: "number", default: 0 },
       { name: "seo_title", label: "SEO title", type: "text" },
       { name: "seo_description", label: "SEO description", type: "textarea" },
       { name: "og_image", label: "Social share image URL", type: "text", hint: "1200x630 recommended" }
@@ -104,7 +104,7 @@ export const CMS_RESOURCES = {
       { name: "website_url", label: "Website URL", type: "text" },
       { name: "description", label: "Description", type: "textarea" },
       { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
-      { name: "sort_order", label: "Sort order", type: "number" }
+      { name: "sort_order", label: "Sort order", type: "number", default: 0 }
     ]
   },
 
@@ -177,7 +177,7 @@ export const CMS_RESOURCES = {
       { name: "status", label: "Status", type: "select", options: ["draft", "active", "paused"] },
       { name: "start_date", label: "Start date", type: "text", hint: "ISO date, optional" },
       { name: "end_date", label: "End date", type: "text", hint: "ISO date, optional" },
-      { name: "sort_order", label: "Sort order", type: "number" }
+      { name: "sort_order", label: "Sort order", type: "number", default: 0 }
     ]
   },
 
@@ -222,7 +222,7 @@ export const CMS_RESOURCES = {
       { name: "title", label: "Title", type: "text", required: true },
       { name: "body", label: "Body", type: "textarea" },
       { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
-      { name: "sort_order", label: "Sort order", type: "number" }
+      { name: "sort_order", label: "Sort order", type: "number", default: 0 }
     ]
   },
 
@@ -241,7 +241,7 @@ export const CMS_RESOURCES = {
       { name: "href", label: "Link", type: "text", required: true, hint: "/brands, /#faq, https://..., mailto:..." },
       { name: "visible_when", label: "Show when", type: "select", options: ["always", "has_brands", "has_updates", "has_publications", "has_partners", "has_faq", "has_contact"], hint: "Hides the link until its destination has published content. For a page link use always and only publish the page" },
       { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
-      { name: "sort_order", label: "Sort order", type: "number" }
+      { name: "sort_order", label: "Sort order", type: "number", default: 0 }
     ]
   },
 
@@ -259,7 +259,99 @@ export const CMS_RESOURCES = {
       { name: "question", label: "Question", type: "text", required: true },
       { name: "answer", label: "Answer", type: "richtext", required: true },
       { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
-      { name: "sort_order", label: "Sort order", type: "number" }
+      { name: "sort_order", label: "Sort order", type: "number", default: 0 }
+    ]
+  },
+
+  forms: {
+    label: "Forms",
+    table: "lummet_forms",
+    listColumns: [
+      { key: "form_key", label: "Key" },
+      { key: "title", label: "Title" },
+      { key: "status", label: "Status" }
+    ],
+    orderBy: "form_key",
+    fields: [
+      { name: "form_key", label: "Key", type: "text", required: true, hint: "contact -> /contact, demo -> /demo, anything else -> /forms/<key>" },
+      { name: "eyebrow", label: "Eyebrow", type: "text" },
+      { name: "title", label: "Title", type: "text", required: true },
+      { name: "intro", label: "Intro", type: "richtext" },
+      { name: "submit_label", label: "Button label", type: "text", required: true },
+      { name: "success_title", label: "Success title", type: "text", required: true },
+      { name: "success_message", label: "Success message", type: "richtext", required: true },
+      { name: "side_title", label: "Side panel title", type: "text", hint: "Leave side title and body empty to hide the side panel" },
+      { name: "side_body", label: "Side panel body", type: "richtext" },
+      { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
+      { name: "seo_title", label: "SEO title", type: "text" },
+      { name: "seo_description", label: "SEO description", type: "textarea" },
+      { name: "og_image", label: "Social share image URL", type: "text" }
+    ]
+  },
+
+  form_fields: {
+    label: "Form fields",
+    table: "lummet_form_fields",
+    listColumns: [
+      { key: "form_key", label: "Form" },
+      { key: "label", label: "Label" },
+      { key: "type", label: "Type" },
+      { key: "required", label: "Required" },
+      { key: "status", label: "Status" }
+    ],
+    orderBy: "form_key, sort_order, id",
+    fields: [
+      { name: "form_key", label: "Form key", type: "text", required: true },
+      { name: "field_key", label: "Field key", type: "text", required: true, hint: "Letters, numbers and underscores. name, email and message get special treatment in the Inquiries list" },
+      { name: "label", label: "Label", type: "text", required: true },
+      { name: "type", label: "Type", type: "select", options: ["text", "email", "tel", "url", "textarea", "select"] },
+      { name: "required", label: "Required (1 = yes, 0 = no)", type: "number", default: 0 },
+      { name: "placeholder", label: "Placeholder", type: "text" },
+      { name: "help_text", label: "Help text", type: "text" },
+      { name: "options", label: "Options (select only, one per line)", type: "textarea" },
+      { name: "max_length", label: "Max length", type: "number", default: 2000 },
+      { name: "status", label: "Status", type: "select", options: ["draft", "published"] },
+      { name: "sort_order", label: "Sort order", type: "number", default: 0 }
+    ]
+  },
+
+  inquiries: {
+    label: "Inquiries",
+    table: "lummet_inquiries",
+    supportsCreate: false,
+    listColumns: [
+      { key: "created_at", label: "Received (UTC)" },
+      { key: "form_key", label: "Form" },
+      { key: "name", label: "Name" },
+      { key: "email", label: "Email" },
+      { key: "summary", label: "Summary" },
+      { key: "status", label: "Status" }
+    ],
+    orderBy: "id DESC",
+    fields: [
+      { name: "created_at", label: "Received (UTC)", type: "text", readOnly: true },
+      { name: "form_key", label: "Form", type: "text", readOnly: true },
+      { name: "name", label: "Name", type: "text", readOnly: true },
+      { name: "email", label: "Email", type: "text", readOnly: true },
+      { name: "details", label: "Submission", type: "textarea", readOnly: true },
+      { name: "status", label: "Status", type: "select", options: ["new", "read", "replied", "spam", "archived"] },
+      { name: "admin_notes", label: "Internal notes (never shown publicly)", type: "textarea" }
+    ]
+  },
+
+  ui_strings: {
+    label: "Interface text",
+    table: "lummet_ui_strings",
+    listColumns: [
+      { key: "group_key", label: "Group" },
+      { key: "ui_key", label: "Key" },
+      { key: "value", label: "Text" }
+    ],
+    orderBy: "group_key, ui_key",
+    fields: [
+      { name: "ui_key", label: "Key", type: "text", required: true, hint: "Referenced by the site templates. Renaming a seeded key blanks that label" },
+      { name: "value", label: "Text", type: "textarea", required: true },
+      { name: "group_key", label: "Group", type: "text" }
     ]
   }
 };

@@ -38,3 +38,14 @@ export async function get(handle, env, path, init = {}) {
   const res = await handle({ request, env, ctx: { waitUntil() {} }, isAdmin: async () => false });
   return res;
 }
+
+/** POST a urlencoded form to the public router. Returns the Response. */
+export async function post(handle, env, path, fields = {}, { headers = {}, ctx } = {}) {
+  const body = new URLSearchParams(fields).toString();
+  const request = new Request(`https://lummet.test${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'https://lummet.test', ...headers },
+    body
+  });
+  return handle({ request, env, ctx: ctx || { waitUntil() {} }, isAdmin: async () => false });
+}

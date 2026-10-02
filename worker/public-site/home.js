@@ -14,6 +14,7 @@ import { brandModel, updateModel, publicationModel, partnerModel, featureModel, 
 import { sanitizeHtml } from "./sanitize.js";
 import { safeUrl, isExternal, formatDate } from "./format.js";
 import { heroGraphSvg } from "./hero-graph.js";
+import { isLiveHref } from "./links.js";
 
 const KINDS = new Set([
   "text", "features", "steps", "checklist", "panel", "brands", "stats",
@@ -51,7 +52,7 @@ function sectionShell(row, extra = {}) {
 
 export async function buildHome(ctx) {
   const { env, siteCtx } = ctx;
-  const { site, settings, counts } = siteCtx;
+  const { site, settings, counts, ui } = siteCtx;
 
   const [rows, features, faqs, brands, updates, publications, partners, banner] = await Promise.all([
     listHomepageSections(env),
@@ -90,7 +91,7 @@ export async function buildHome(ctx) {
         if (updates.length) sections.push(sectionShell(row, { items: updates.map(updateModel) }));
         break;
       case "insights":
-        if (publications.length) sections.push(sectionShell(row, { items: publications.map(publicationModel) }));
+        if (publications.length) sections.push(sectionShell(row, { items: publications.map((p) => publicationModel(p, ui)) }));
         break;
       case "partners":
         if (partners.length) sections.push(sectionShell(row, { items: partners.map(partnerModel) }));
@@ -102,27 +103,41 @@ export async function buildHome(ctx) {
       }
       case "stats": {
         const stats = [];
-        if (counts.brands) stats.push({ value: String(counts.brands), label: counts.brands === 1 ? "Brand on the platform" : "Brands on the platform" });
-        if (counts.updates) stats.push({ value: String(counts.updates), label: counts.updates === 1 ? "Platform update published" : "Platform updates published" });
-        if (counts.publications) stats.push({ value: String(counts.publications), label: counts.publications === 1 ? "Insight published" : "Insights published" });
+        const one = (n, a, b) => (n === 1 ? ui[a] : ui[b]);
+        if (counts.brands) stats.push({ value: String(counts.brands), label: one(counts.brands, "stat_brand_one", "stat_brand_many") });
+        if (counts.updates) stats.push({ value: String(counts.updates), label: one(counts.updates, "stat_update_one", "stat_update_many") });
+        if (counts.publications) stats.push({ value: String(counts.publications), label: one(counts.publications, "stat_insight_one", "stat_insight_many") });
         const latest = formatDate(counts.latestUpdate);
-        if (latest.label) stats.push({ value: latest.label, label: "Latest platform update", is_text: true });
+        if (latest.label && ui.stat_latest) stats.push({ value: latest.label, label: ui.stat_latest, is_text: true });
+        for (const st of stats) if (!st.label) st.label = "";
         if (stats.length) sections.push(sectionShell(row, { items: stats }));
         break;
       }
-      case "cta": {
-        const shell = sectionShell(row);
-        const needsContact = shell.cta_href === "#contact" && !site.has_contact;
-        if (shell.cta_label && !needsContact) sections.push(shell);
-        break;
-      }
+      case "cta":
       case "contact":
-        if (site.has_contact) sections.push(sectionShell(row));
+        sections.push(sectionShell(row)); // kept or dropped in the liveness pass below
         break;
       default: // text
         if (row.title || row.body) sections.push(sectionShell(row));
     }
   }
+
+  // Liveness pass: a button whose destination has no published content (or is an
+  // anchor to a section that is not on this page) is removed, not left dead.
+  const present = new Set(sections.map((s) => s.key));
+  for (const sec of sections) {
+    if (sec.cta_label && !isLiveHref(sec.cta_href, { counts, anchors: present })) {
+      sec.cta_label = "";
+      sec.cta_href = "";
+    }
+  }
+  for (let i = sections.length - 1; i >= 0; i--) {
+    const sec = sections[i];
+    if (sec.is_cta && !sec.cta_label) sections.splice(i, 1);
+    else if (sec.is_contact && !sec.cta_label && !site.has_contact) sections.splice(i, 1);
+    else if (sec.is_panel && !sec.cta_label && !sec.body_html && !(sec.items || []).length) sections.splice(i, 1);
+  }
+  const liveKeys = new Set(sections.map((s) => s.key));
 
   const heroTitle = (settings.hero_title || "").trim();
   const hero = heroTitle
@@ -134,15 +149,12 @@ export async function buildHome(ctx) {
         primary_href: safeUrl(settings.hero_cta_primary_href),
         secondary_label: settings.hero_cta_secondary_label || "",
         secondary_href: safeUrl(settings.hero_cta_secondary_href),
-        graph_svg: heroGraphSvg(site.name, brandCards)
+        graph_svg: heroGraphSvg(site.name, brandCards, ui)
       }
     : null;
   if (hero) {
-    hero.has_primary = Boolean(hero.primary_label && hero.primary_href);
-    // A CTA pointing at a section that is not on the page would be a dead link.
-    const present = new Set(sections.map((s) => `#${s.key}`));
-    const live = (href) => !href.startsWith("#") || present.has(href);
-    if (!live(hero.primary_href)) hero.has_primary = false;
+    const live = (href) => isLiveHref(href, { counts, anchors: liveKeys });
+    hero.has_primary = Boolean(hero.primary_label && hero.primary_href && live(hero.primary_href));
     hero.has_secondary = Boolean(hero.secondary_label && hero.secondary_href && live(hero.secondary_href));
   }
 

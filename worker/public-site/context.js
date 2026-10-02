@@ -6,14 +6,16 @@
 // footer are content, not markup.
 // =====================================================
 
-import { getSettings, getNavLinks, getSiteCounts, listHomepageAnchors } from "./data.js";
+import { getSettings, getNavLinks, getSiteCounts, listHomepageAnchors, getUiStrings } from "./data.js";
 import { safeUrl, safeCssColor, initials } from "./format.js";
 import { iconSvg } from "./icons.js";
+import { isLiveHref } from "./links.js";
 
+// Column titles come from lummet_ui_strings (footer_<name>_title).
 const FOOTER_COLUMNS = [
-  { placement: "footer_platform", title: "Platform" },
-  { placement: "footer_company", title: "Company" },
-  { placement: "footer_legal", title: "Legal" }
+  { placement: "footer_platform", titleKey: "footer_platform_title" },
+  { placement: "footer_company", titleKey: "footer_company_title" },
+  { placement: "footer_legal", titleKey: "footer_legal_title" }
 ];
 
 /** Decide whether a nav link should show, based on whether its destination has content. */
@@ -27,6 +29,7 @@ export function isLinkVisible(rule, { counts, hasContact }) {
   if (r === "has_faq") return counts.faqs > 0;
   if (r === "has_contact") return hasContact;
   if (r.startsWith("page:")) return counts.pageSlugs.has(r.slice(5));
+  if (r.startsWith("form:")) return counts.formKeys.has(r.slice(5));
   return false; // unknown rule: hide rather than guess
 }
 
@@ -77,11 +80,12 @@ function anchorOf(href) {
 }
 
 export async function loadSite(env, url) {
-  const [settings, counts, links, anchorRows] = await Promise.all([
+  const [settings, counts, links, anchorRows, ui] = await Promise.all([
     getSettings(env),
     getSiteCounts(env),
     getNavLinks(env),
-    listHomepageAnchors(env)
+    listHomepageAnchors(env),
+    getUiStrings(env)
   ]);
 
   const contactEmail = (settings.contact_email && settings.contact_email.trim()) || env.CONTACT_EMAIL || "";
@@ -93,7 +97,8 @@ export async function loadSite(env, url) {
   const visible = links.filter((l) => {
     if (!isLinkVisible(l.visible_when, visibility)) return false;
     const anchor = anchorOf(l.href);
-    return anchor === null || anchors.has(anchor);
+    if (anchor !== null && !anchors.has(anchor)) return false;
+    return isLiveHref(l.href, { counts });
   });
   const byPlacement = (p) =>
     visible
@@ -103,17 +108,24 @@ export async function loadSite(env, url) {
 
   const navMain = byPlacement("header").map((l) => ({ ...l, active: isActive(l.href, path) }));
   const navCta = byPlacement("header_cta").map((l, i, arr) => ({ ...l, is_primary: i === arr.length - 1 }));
-  const footerColumns = FOOTER_COLUMNS.map((c) => ({ title: c.title, links: byPlacement(c.placement) })).filter(
+  const footerColumns = FOOTER_COLUMNS.map((c) => ({ title: ui[c.titleKey] || "", links: byPlacement(c.placement) })).filter(
     (c) => c.links.length
   );
 
   const name = (settings.site_name && settings.site_name.trim()) || "Lummet";
   const logo = safeUrl(settings.logo_url);
 
+  // Where "talk to us" links should go: the contact form if one is published,
+  // otherwise a mailto link if an address is configured, otherwise nowhere.
+  const contactUrl = counts.formKeys.has("contact") ? "/contact" : hasContact ? `mailto:${contactEmail}` : "";
+
   return {
     settings,
     counts,
+    ui,
     site: {
+      contact_url: contactUrl,
+      has_contact_url: Boolean(contactUrl),
       name,
       title: (settings.site_title && settings.site_title.trim()) || name,
       description: (settings.site_description && settings.site_description.trim()) || "",

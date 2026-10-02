@@ -146,3 +146,31 @@ a.card:hover .card-cta svg { transform: translateX(4px); }
 /* ---- Scroll reveal (progressive: content is visible without JS) ---- */
 .js .reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.6s var(--ease), transform 0.6s var(--ease); }
 .js .reveal.is-visible { opacity: 1; transform: none; }
+
+/* ---- Forms (contact, demo, ...) ---- */
+.form-layout { display: grid; gap: var(--space-6); grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 900px) { .form-layout { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); } .form-layout-single { grid-template-columns: minmax(0, 720px); } }
+.form-card { padding: clamp(1.25rem, 3vw, 2.25rem); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-md); }
+.form-note { margin: 0 0 var(--space-5); font-size: var(--fs-xs); color: var(--ink-faint); }
+.field { margin-bottom: var(--space-5); }
+.field label { display: block; margin-bottom: 6px; font-weight: 650; font-size: var(--fs-sm); }
+.field .req { color: var(--danger); }
+.field input, .field select, .field textarea {
+  width: 100%; font: inherit; font-size: 16px; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 12px 14px;
+  transition: border-color 0.15s, box-shadow 0.15s; }
+.field textarea { resize: vertical; min-height: 140px; line-height: 1.5; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.field.has-error input, .field.has-error select, .field.has-error textarea { border-color: var(--danger); background: var(--danger-soft); }
+.field .help { margin: 6px 0 0; font-size: var(--fs-xs); color: var(--ink-faint); }
+.field-error { margin: 6px 0 0; font-size: var(--fs-xs); font-weight: 600; color: var(--danger); }
+.form-alert { margin-bottom: var(--space-5); padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--danger); background: var(--danger-soft); color: var(--ink); font-weight: 600; font-size: var(--fs-sm); }
+.form-card .btn { width: 100%; }
+@media (min-width: 640px) { .form-card .btn { width: auto; } }
+.form-success { display: grid; gap: var(--space-3); justify-items: start; padding-block: var(--space-4); }
+.form-success h2 { margin: 0; }
+.form-side h2 { font-size: 1.15rem; }
+.form-side .prose { font-size: var(--fs-sm); }
+.side-mail { margin: var(--space-4) 0 0; font-size: var(--fs-sm); color: var(--ink-dim); overflow-wrap: anywhere; }
+.contact-mail { margin: var(--space-4) 0 0; overflow-wrap: anywhere; }
+.hp { position: absolute !important; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }

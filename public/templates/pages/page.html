@@ -9,7 +9,7 @@
   <div class="section section-tight">
     <div class="container narrow">
       <div class="prose">{{{page.content_html}}}</div>
-      {{#if page.updated_iso}}<p class="updated-note">Last updated <time datetime="{{page.updated_iso}}">{{page.updated_iso}}</time></p>{{/if}}
+      {{#if page.updated_iso}}<p class="updated-note">{{ui.last_updated}} <time datetime="{{page.updated_iso}}">{{page.updated_iso}}</time></p>{{/if}}
     </div>
   </div>
 </article>

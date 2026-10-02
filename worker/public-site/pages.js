@@ -7,6 +7,7 @@
 
 import * as data from "./data.js";
 import { brandModel, updateModel, publicationModel, partnerModel, authorModel, typeLabel } from "./models.js";
+import { PAGE_ALIASES } from "./links.js";
 import { sanitizeHtml } from "./sanitize.js";
 import { renderPage } from "./render.js";
 import { buildHead, breadcrumbLd, organizationLd, websiteLd, absoluteUrl } from "./seo.js";
@@ -16,8 +17,7 @@ import { stripTags, truncate, safeUrl, readingMinutes } from "./format.js";
 const UPDATES_PER_PAGE = 10;
 const INSIGHTS_PER_PAGE = 9;
 
-/** Clean URLs for the pages the site links to from nav and footer. */
-export const PAGE_ALIASES = new Set(["about", "security", "privacy", "terms"]);
+export { PAGE_ALIASES };
 
 export function pageCanonicalPath(slug) {
   return PAGE_ALIASES.has(slug) ? `/${slug}` : `/p/${slug}`;
@@ -54,6 +54,8 @@ function crumbs(list) {
   return list.map((c, i) => ({ ...c, last: i === list.length - 1 }));
 }
 
+const heading_for = (ui, key) => ui[`title_${key}`] || "";
+
 const intro = (settings, key, fallbackTitle) => ({
   title: (settings[`${key}_title`] || "").trim() || fallbackTitle,
   intro: (settings[`${key}_intro`] || "").trim()
@@ -62,7 +64,7 @@ const intro = (settings, key, fallbackTitle) => ({
 // ---------------------------------------------------------------- home
 
 export async function homePage(ctx) {
-  const { site } = ctx.siteCtx;
+  const { site, ui } = ctx.siteCtx;
   const home = await buildHome(ctx);
   const ld = [organizationLd(site), websiteLd(site)];
   if (home.faqItems.length) {
@@ -88,13 +90,13 @@ export async function homePage(ctx) {
 // -------------------------------------------------------------- brands
 
 export async function brandsPage(ctx) {
-  const { site, settings } = ctx.siteCtx;
+  const { site, settings, ui } = ctx.siteCtx;
   const rows = await data.listBrands(ctx.env, 200);
   const brands = rows.map(brandModel);
   const counts = new Map();
   for (const b of brands) if (b.category) counts.set(b.category, (counts.get(b.category) || 0) + 1);
   const categories = [...counts.entries()].map(([name, n]) => ({ name, count: n }));
-  const heading = intro(settings, "brands", "Brands");
+  const heading = intro(settings, "brands", ui.title_brands || "");
   const head = buildHead({
     site,
     title: heading.title,
@@ -103,7 +105,7 @@ export async function brandsPage(ctx) {
     noindex: brands.length === 0,
     jsonLd: [
       { "@type": "CollectionPage", name: heading.title, url: absoluteUrl(site, "/brands") },
-      breadcrumbLd(site, [crumb("Home", "/"), crumb("Brands", "/brands")]),
+      breadcrumbLd(site, [crumb(ui.crumb_home, "/"), crumb(heading_for(ui, "brands"), "/brands")]),
       ...(brands.length
         ? [{
             "@type": "ItemList",
@@ -114,7 +116,7 @@ export async function brandsPage(ctx) {
   });
   return renderPage(ctx, {
     template: "brands",
-    data: { ...heading, brands, categories, has_categories: categories.some((c) => c.count > 1) },
+    data: { ...heading, brands, categories, has_categories: categories.some((c) => c.count > 1), crumbs: crumbs([crumb(ui.crumb_home, "/"), crumb(heading.title, "/brands")]) },
     head,
     bodyClass: "page-brands"
   });
@@ -123,12 +125,12 @@ export async function brandsPage(ctx) {
 export async function brandPage(ctx, { slug }) {
   const row = await data.getBrand(ctx.env, slug);
   if (!row) return null;
-  const { site } = ctx.siteCtx;
+  const { site, ui } = ctx.siteCtx;
   const brand = brandModel(row);
   const others = (await data.listBrands(ctx.env, 12)).filter((b) => b.slug !== slug).map(brandModel);
   const related = others.filter((b) => b.category && b.category === brand.category).concat(others.filter((b) => b.category !== brand.category)).slice(0, 3);
   const description = row.seo_description || brand.summary || `${brand.name} is part of the ${site.name} platform.`;
-  const trail = [crumb("Home", "/"), crumb("Brands", "/brands"), crumb(brand.name, brand.url)];
+  const trail = [crumb(ui.crumb_home, "/"), crumb(heading_for(ui, "brands"), "/brands"), crumb(brand.name, brand.url)];
   const org = { "@type": "Organization", name: brand.name, url: brand.website_url || absoluteUrl(site, brand.url), description };
   if (brand.logo_url) org.logo = absoluteUrl(site, brand.logo_url);
   const head = buildHead({
@@ -150,24 +152,24 @@ export async function brandPage(ctx, { slug }) {
 // ------------------------------------------------------------- updates
 
 export async function updatesPage(ctx) {
-  const { site, settings } = ctx.siteCtx;
+  const { site, settings, ui } = ctx.siteCtx;
   const page = pageNumber(ctx.url);
   const total = await data.countUpdates(ctx.env);
   const rows = await data.listUpdates(ctx.env, { limit: UPDATES_PER_PAGE, offset: (page - 1) * UPDATES_PER_PAGE });
   if (page > 1 && !rows.length) return null;
-  const heading = intro(settings, "updates", "Updates");
+  const heading = intro(settings, "updates", ui.title_updates || "");
   const p = pager("/updates", page, total, UPDATES_PER_PAGE);
   const head = buildHead({
     site,
-    title: page > 1 ? `${heading.title} — page ${page}` : heading.title,
+    title: page > 1 ? `${heading.title} — ${ui.page_word} ${page}` : heading.title,
     description: heading.intro,
     path: page > 1 ? `/updates?page=${page}` : "/updates",
     noindex: total === 0,
     prev: p.prev_href || undefined,
     next: p.next_href || undefined,
-    jsonLd: [{ "@type": "CollectionPage", name: heading.title, url: absoluteUrl(site, "/updates") }, breadcrumbLd(site, [crumb("Home", "/"), crumb("Updates", "/updates")])]
+    jsonLd: [{ "@type": "CollectionPage", name: heading.title, url: absoluteUrl(site, "/updates") }, breadcrumbLd(site, [crumb(ui.crumb_home, "/"), crumb(heading_for(ui, "updates"), "/updates")])]
   });
-  return renderPage(ctx, { template: "updates", data: { ...heading, updates: rows.map(updateModel), pager: p }, head, bodyClass: "page-updates" });
+  return renderPage(ctx, { template: "updates", data: { ...heading, updates: rows.map(updateModel), pager: p, crumbs: crumbs([crumb(ui.crumb_home, "/"), crumb(heading.title, "/updates")]) }, head, bodyClass: "page-updates" });
 }
 
 function articleJsonLd(site, item, kind, trail) {
@@ -188,10 +190,10 @@ function articleJsonLd(site, item, kind, trail) {
 export async function updatePage(ctx, { slug }) {
   const row = await data.getUpdate(ctx.env, slug);
   if (!row) return null;
-  const { site } = ctx.siteCtx;
+  const { site, ui } = ctx.siteCtx;
   const update = updateModel(row);
   const more = (await data.listUpdates(ctx.env, { limit: 3, excludeSlug: slug })).map(updateModel);
-  const trail = [crumb("Home", "/"), crumb("Updates", "/updates"), crumb(update.title, update.url)];
+  const trail = [crumb(ui.crumb_home, "/"), crumb(heading_for(ui, "updates"), "/updates"), crumb(update.title, update.url)];
   const head = buildHead({
     site,
     title: row.seo_title || update.title,
@@ -208,7 +210,7 @@ export async function updatePage(ctx, { slug }) {
 // ------------------------------------------------------------ insights
 
 export async function insightsPage(ctx) {
-  const { site, settings } = ctx.siteCtx;
+  const { site, settings, ui } = ctx.siteCtx;
   const page = pageNumber(ctx.url);
   const typeParam = ctx.url.searchParams.get("type");
   const types = await data.listPublicationTypes(ctx.env);
@@ -216,27 +218,27 @@ export async function insightsPage(ctx) {
   const total = await data.countPublications(ctx.env, activeType);
   const rows = await data.listPublications(ctx.env, { type: activeType, limit: INSIGHTS_PER_PAGE, offset: (page - 1) * INSIGHTS_PER_PAGE });
   if (page > 1 && !rows.length) return null;
-  const heading = intro(settings, "insights", "Insights");
+  const heading = intro(settings, "insights", ui.title_insights || "");
   const extra = activeType ? { type: activeType } : {};
   const p = pager("/insights", page, total, INSIGHTS_PER_PAGE, extra);
   const filters = types.length > 1
-    ? [{ label: "All", href: "/insights", current: !activeType }, ...types.map((t) => ({ label: `${typeLabel(t.type)} (${t.n})`, href: `/insights?type=${encodeURIComponent(t.type)}`, current: t.type === activeType }))]
+    ? [{ label: ui.filter_all || "", href: "/insights", current: !activeType }, ...types.map((t) => ({ label: `${typeLabel(ui, t.type)} (${t.n})`, href: `/insights?type=${encodeURIComponent(t.type)}`, current: t.type === activeType }))]
     : [];
   const qs = new URLSearchParams(extra);
   if (page > 1) qs.set("page", String(page));
   const head = buildHead({
     site,
-    title: page > 1 ? `${heading.title} — page ${page}` : heading.title,
+    title: page > 1 ? `${heading.title} — ${ui.page_word} ${page}` : heading.title,
     description: heading.intro,
     path: qs.toString() ? `/insights?${qs}` : "/insights",
     noindex: total === 0 || Boolean(activeType),
     prev: p.prev_href || undefined,
     next: p.next_href || undefined,
-    jsonLd: [{ "@type": "CollectionPage", name: heading.title, url: absoluteUrl(site, "/insights") }, breadcrumbLd(site, [crumb("Home", "/"), crumb("Insights", "/insights")])]
+    jsonLd: [{ "@type": "CollectionPage", name: heading.title, url: absoluteUrl(site, "/insights") }, breadcrumbLd(site, [crumb(ui.crumb_home, "/"), crumb(heading_for(ui, "insights"), "/insights")])]
   });
   return renderPage(ctx, {
     template: "insights",
-    data: { ...heading, insights: rows.map(publicationModel), pager: p, filters, has_filters: filters.length > 0 },
+    data: { ...heading, insights: rows.map((r) => publicationModel(r, ui)), pager: p, filters, has_filters: filters.length > 0, crumbs: crumbs([crumb(ui.crumb_home, "/"), crumb(heading.title, "/insights")]) },
     head,
     bodyClass: "page-insights"
   });
@@ -245,10 +247,10 @@ export async function insightsPage(ctx) {
 export async function insightPage(ctx, { slug }) {
   const row = await data.getPublication(ctx.env, slug);
   if (!row) return null;
-  const { site } = ctx.siteCtx;
-  const insight = publicationModel(row);
-  const more = (await data.listPublications(ctx.env, { limit: 3, excludeSlug: slug })).map(publicationModel);
-  const trail = [crumb("Home", "/"), crumb("Insights", "/insights"), crumb(insight.title, insight.url)];
+  const { site, ui } = ctx.siteCtx;
+  const insight = publicationModel(row, ui);
+  const more = (await data.listPublications(ctx.env, { limit: 3, excludeSlug: slug })).map((r) => publicationModel(r, ui));
+  const trail = [crumb(ui.crumb_home, "/"), crumb(heading_for(ui, "insights"), "/insights"), crumb(insight.title, insight.url)];
   const head = buildHead({
     site,
     title: row.seo_title || insight.title,
@@ -265,18 +267,18 @@ export async function insightPage(ctx, { slug }) {
 // ------------------------------------------------------------- partners
 
 export async function partnersPage(ctx) {
-  const { site, settings } = ctx.siteCtx;
+  const { site, settings, ui } = ctx.siteCtx;
   const partners = (await data.listPartners(ctx.env, 200)).map(partnerModel);
-  const heading = intro(settings, "partners", "Partners");
+  const heading = intro(settings, "partners", ui.title_partners || "");
   const head = buildHead({
     site,
     title: heading.title,
     description: heading.intro,
     path: "/partners",
     noindex: partners.length === 0,
-    jsonLd: [{ "@type": "CollectionPage", name: heading.title, url: absoluteUrl(site, "/partners") }, breadcrumbLd(site, [crumb("Home", "/"), crumb("Partners", "/partners")])]
+    jsonLd: [{ "@type": "CollectionPage", name: heading.title, url: absoluteUrl(site, "/partners") }, breadcrumbLd(site, [crumb(ui.crumb_home, "/"), crumb(heading_for(ui, "partners"), "/partners")])]
   });
-  return renderPage(ctx, { template: "partners", data: { ...heading, partners }, head, bodyClass: "page-partners" });
+  return renderPage(ctx, { template: "partners", data: { ...heading, partners, crumbs: crumbs([crumb(ui.crumb_home, "/"), crumb(heading.title, "/partners")]) }, head, bodyClass: "page-partners" });
 }
 
 // -------------------------------------------------------------- authors
@@ -284,12 +286,12 @@ export async function partnersPage(ctx) {
 export async function authorPage(ctx, { slug }) {
   const row = await data.getAuthor(ctx.env, slug);
   if (!row) return null;
-  const { site } = ctx.siteCtx;
+  const { site, ui } = ctx.siteCtx;
   const author = authorModel(row);
   const work = await data.listAuthorWork(ctx.env, row.id);
   const updates = work.updates.map(updateModel);
-  const insights = work.publications.map(publicationModel);
-  const trail = [crumb("Home", "/"), crumb(author.name, author.url)];
+  const insights = work.publications.map((r) => publicationModel(r, ui));
+  const trail = [crumb(ui.crumb_home, "/"), crumb(author.name, author.url)];
   const description = author.bio || `${author.name}${author.title ? `, ${author.title}` : ""} at ${site.name}.`;
   const head = buildHead({
     site,
@@ -313,10 +315,10 @@ export async function authorPage(ctx, { slug }) {
 export async function cmsPage(ctx, { slug }) {
   const row = await data.getPage(ctx.env, slug);
   if (!row) return null;
-  const { site } = ctx.siteCtx;
+  const { site, ui } = ctx.siteCtx;
   const path = pageCanonicalPath(slug);
   const contentHtml = sanitizeHtml(row.content || "");
-  const trail = [crumb("Home", "/"), crumb(row.title, path)];
+  const trail = [crumb(ui.crumb_home, "/"), crumb(row.title, path)];
   const description = row.seo_description || row.excerpt || truncate(stripTags(contentHtml), 170);
   const page = {
     title: row.title,
@@ -341,7 +343,7 @@ export async function cmsPage(ctx, { slug }) {
 // ------------------------------------------------------------------ 404
 
 export async function notFoundPage(ctx) {
-  const { site } = ctx.siteCtx;
-  const head = buildHead({ site, title: "Page not found", description: "", path: ctx.url.pathname, noindex: true });
+  const { site, ui } = ctx.siteCtx;
+  const head = buildHead({ site, title: ui.not_found_title || "", description: "", path: ctx.url.pathname, noindex: true });
   return renderPage(ctx, { template: "404", data: {}, head, status: 404, bodyClass: "page-404" });
 }

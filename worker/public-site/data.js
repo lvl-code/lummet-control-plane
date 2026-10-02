@@ -48,6 +48,7 @@ export async function getSiteCounts(env) {
        (SELECT MAX(COALESCE(published_at, created_at)) FROM lummet_updates WHERE status = 'published') AS latest_update`
   );
   const pages = await all(env, `SELECT slug FROM lummet_pages WHERE status = 'published'`);
+  const forms = await all(env, `SELECT form_key FROM lummet_forms WHERE status = 'published'`);
   return {
     brands: row?.brands || 0,
     updates: row?.updates || 0,
@@ -55,7 +56,8 @@ export async function getSiteCounts(env) {
     partners: row?.partners || 0,
     faqs: row?.faqs || 0,
     latestUpdate: row?.latest_update || null,
-    pageSlugs: new Set(pages.map((p) => p.slug))
+    pageSlugs: new Set(pages.map((p) => p.slug)),
+    formKeys: new Set(forms.map((f) => f.form_key))
   };
 }
 
@@ -66,6 +68,55 @@ export function listHomepageAnchors(env) {
     `SELECT section_key, kind, cta_href FROM lummet_homepage_sections
      WHERE status = 'published' AND section_key IS NOT NULL`
   );
+}
+
+// ---- Interface text ------------------------------------
+
+/** Every interface string (button labels, aria labels, empty states, form errors) as { key: value }. */
+export async function getUiStrings(env) {
+  const rows = await all(env, `SELECT ui_key, value FROM lummet_ui_strings`);
+  const out = {};
+  for (const r of rows) out[r.ui_key] = r.value;
+  return out;
+}
+
+// ---- Forms (contact, demo, ...) --------------------------
+
+export function getForm(env, key) {
+  return first(env, `SELECT * FROM lummet_forms WHERE form_key = ? AND status = 'published'`, key);
+}
+
+export function listFormFields(env, key) {
+  return all(
+    env,
+    `SELECT * FROM lummet_form_fields WHERE form_key = ? AND status = 'published' ORDER BY sort_order, id`,
+    key
+  );
+}
+
+export function listPublishedForms(env) {
+  return all(env, `SELECT form_key, updated_at FROM lummet_forms WHERE status = 'published' ORDER BY form_key`);
+}
+
+export async function countRecentInquiriesByIp(env, ipHash, sinceIso) {
+  const row = await first(
+    env,
+    `SELECT COUNT(*) AS n FROM lummet_inquiries WHERE ip_hash = ? AND created_at >= ?`,
+    ipHash || "",
+    sinceIso
+  );
+  return row?.n || 0;
+}
+
+export async function insertInquiry(env, row) {
+  const res = await db(env)
+    .prepare(
+      `INSERT INTO lummet_inquiries (form_key, name, email, summary, details, payload, status, ip_hash)
+       VALUES (?, ?, ?, ?, ?, ?, 'new', ?) RETURNING id`
+    )
+    .bind(row.form_key, row.name, row.email, row.summary, row.details, row.payload, row.ip_hash || "")
+    .first();
+  return res?.id ?? null;
 }
 
 // ---- Brands ------------------------------------------

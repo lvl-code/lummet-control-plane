@@ -10,6 +10,7 @@
 //   /insights /insights/:slug
 //   /partners
 //   /authors/:slug
+//   /contact  /demo  /forms/:key     (GET page + POST submission)
 //   /p/:slug   plus clean aliases /about /security /privacy /terms
 //   /sitemap.xml  /robots.txt
 //   /static/*            css / js / images (Workers Assets)
@@ -20,6 +21,7 @@
 
 import { loadSite } from "./context.js";
 import * as pages from "./pages.js";
+import * as forms from "./forms.js";
 import { sitemapXml, robotsTxt } from "./sitemap.js";
 import { textResponse } from "./render.js";
 
@@ -50,7 +52,17 @@ const ROUTES = [
   ["/insights", pages.insightsPage],
   ["/insights/:slug", pages.insightPage],
   ["/partners", pages.partnersPage],
-  ["/authors/:slug", pages.authorPage]
+  ["/authors/:slug", pages.authorPage],
+  ["/contact", (ctx) => forms.formPage(ctx, { key: "contact" })],
+  ["/demo", (ctx) => forms.formPage(ctx, { key: "demo" })],
+  ["/forms/:key", forms.formPage]
+];
+
+// The only public POST routes: form submissions. Same paths as the GET pages.
+const FORM_POST_ROUTES = [
+  ["/contact", (ctx) => forms.submitForm(ctx, { key: "contact" })],
+  ["/demo", (ctx) => forms.submitForm(ctx, { key: "demo" })],
+  ["/forms/:key", forms.submitForm]
 ];
 
 /** Paths this router owns. Anything else is left to the admin app. */
@@ -60,6 +72,25 @@ export function isPublicPath(path) {
   if (path.startsWith("/p/")) return true;
   if (pages.PAGE_ALIASES.has(path.slice(1))) return true;
   return ROUTES.some(([pattern]) => matchPath(pattern, path));
+}
+
+// Last-resort page, used only when the database itself cannot be read, so by
+// definition it cannot come from the database. Kept deliberately minimal.
+function unavailable() {
+  return textResponse(
+    "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Temporarily unavailable</title><body style='font-family:system-ui,sans-serif;padding:3rem;max-width:36rem;margin:auto'><h1>Temporarily unavailable</h1><p>Please try again in a moment.</p>",
+    "text/html; charset=utf-8",
+    { status: 503, cacheControl: "no-store" }
+  );
+}
+
+async function notFoundFor({ env, request, url, execCtx }) {
+  try {
+    const siteCtx = await loadSite(env, url);
+    return await pages.notFoundPage({ env, request, url, siteCtx, execCtx });
+  } catch {
+    return unavailable();
+  }
 }
 
 async function serveStatic(request, env) {
@@ -115,11 +146,25 @@ async function resolve(ctx) {
  */
 export async function handlePublicRoute({ request, env, ctx: execCtx, isAdmin }) {
   const method = request.method.toUpperCase();
-  if (method !== "GET" && method !== "HEAD") return null;
+  if (method !== "GET" && method !== "HEAD" && method !== "POST") return null;
 
   const url = new URL(request.url);
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   if (path !== url.pathname) url.pathname = path;
+
+  if (method === "POST") {
+    const route = FORM_POST_ROUTES.map(([pattern, handler]) => [matchPath(pattern, path), handler]).find(([params]) => params);
+    if (!route) return null;
+    let response;
+    try {
+      const siteCtx = await loadSite(env, url);
+      response = await route[1]({ env, request, url, siteCtx, execCtx }, route[0]);
+    } catch (err) {
+      console.error("public-site form submit failed:", err?.message || err);
+      return unavailable();
+    }
+    return response || (await notFoundFor({ env, request, url, execCtx }));
+  }
 
   if (!isPublicPath(path)) return null;
   if (path.startsWith("/static/")) return serveStatic(request, env);
@@ -127,7 +172,8 @@ export async function handlePublicRoute({ request, env, ctx: execCtx, isAdmin })
   // "/" is shared with the signed-in dashboard: admins keep seeing that.
   if (path === "/" && (await isAdmin())) return null;
 
-  const cache = typeof caches !== "undefined" ? caches.default : null;
+  // A page showing "sent" state, or anything carrying form state, is never shared.
+  const cache = typeof caches !== "undefined" && !url.searchParams.has("sent") ? caches.default : null;
   const key = cacheKeyFor(url);
   if (cache) {
     try {
@@ -144,11 +190,7 @@ export async function handlePublicRoute({ request, env, ctx: execCtx, isAdmin })
     response = await resolve({ env, request, url, siteCtx, execCtx });
   } catch (err) {
     console.error("public-site render failed:", err?.message || err);
-    return textResponse(
-      "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Temporarily unavailable</title><body style='font-family:system-ui,sans-serif;padding:3rem;max-width:36rem;margin:auto'><h1>Temporarily unavailable</h1><p>This site is being updated. Please try again in a moment.</p>",
-      "text/html; charset=utf-8",
-      { status: 503, cacheControl: "no-store" }
-    );
+    return unavailable();
   }
   if (!response) return null;
 

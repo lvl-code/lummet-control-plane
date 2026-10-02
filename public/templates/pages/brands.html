@@ -1,6 +1,6 @@
 <section class="page-hero">
   <div class="container">
-    <nav class="breadcrumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li><span aria-current="page">Brands</span></li></ol></nav>
+    {{> components/breadcrumbs}}
     <h1>{{title}}</h1>
     {{#if intro}}<p class="lede">{{intro}}</p>{{/if}}
   </div>
@@ -9,8 +9,8 @@
   <div class="container">
     {{#if brands}}
       {{#if has_categories}}
-      <div class="filter-bar" role="group" aria-label="Filter brands by category" data-filter-bar hidden>
-        <button type="button" class="chip is-active" data-filter="" aria-pressed="true">All ({{brands.length}})</button>
+      <div class="filter-bar" role="group" aria-label="{{ui.filter_brands_label}}" data-filter-bar hidden>
+        <button type="button" class="chip is-active" data-filter="" aria-pressed="true">{{ui.filter_all}} ({{brands.length}})</button>
         {{#each categories}}<button type="button" class="chip" data-filter="{{name}}" aria-pressed="false">{{name}} ({{count}})</button>{{/each}}
       </div>
       {{/if}}
@@ -18,7 +18,7 @@
         {{#each brands}}{{> components/brand-card}}{{/each}}
       </div>
     {{else}}
-      <div class="empty-state"><p>No brands are published yet.</p></div>
+      <div class="empty-state"><p>{{ui.empty_brands}}</p></div>
     {{/if}}
   </div>
 </section>

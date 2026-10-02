@@ -21,11 +21,13 @@ public/                          Workers Assets root (wrangler.jsonc "assets")
     css/base.css                 reset, typography, layout, header, footer
     css/components.css           buttons, cards, sections, prose, FAQ, panel, stats
     css/pages.css                hero + network graph, page headers, articles, timeline
+    (forms, sticky footer and error styling live in base.css / components.css)
     js/theme.js                  applies light/dark before first paint
     js/nav.js                    mobile menu, theme toggle, header shadow
     js/reveal.js                 scroll reveal (content is visible without JS)
     js/filter.js                 brand category filter (progressive enhancement)
     js/article.js                copy-link button, external links in articles
+    js/form.js                   double-submit guard for the contact / demo forms
     images/                      favicon.svg, brands/<logo files you own>
 
 worker/public-site/
@@ -38,6 +40,8 @@ worker/public-site/
   seo.js        <title>, canonical, Open Graph, Twitter, JSON-LD builders
   render.js     shared layout render, security headers, cache headers
   template.js   the template engine ({{x}} escaped, {{{x}}} raw, if/else/unless/each, partials)
+  forms.js      /contact, /demo, /forms/:key: rendering, validation, spam guards, storage
+  links.js      isLiveHref(): is a link's destination currently published content?
   sitemap.js    sitemap.xml and robots.txt generated from the DB
   hero-graph.js hero network diagram: one SVG node per published brand
   sanitize.js   HTML sanitizer for CMS rich text (same as the tenant's)
@@ -54,6 +58,7 @@ worker/public-site/
 | `/insights`, `/insights/:slug` | `lummet_publications` (filter `?type=`) |
 | `/partners` | `lummet_partners` |
 | `/authors/:slug` | `lummet_authors` + their published work |
+| `/contact`, `/demo`, `/forms/:key` | `lummet_forms` + `lummet_form_fields`; POST stores into `lummet_inquiries` |
 | `/about`, `/security`, `/privacy`, `/terms`, `/p/:slug` | `lummet_pages` |
 | `/sitemap.xml`, `/robots.txt` | generated |
 | `/static/*` | `public/static/**` |
@@ -69,17 +74,64 @@ worker/public-site/
 | Features | the cards, steps, checklist items and AI-panel items inside sections (`group_key` <-> section `feature_group`) |
 | FAQs | the FAQ section, and FAQPage structured data |
 | Navigation links | header, header buttons and the three footer columns |
+| Forms / Form fields | the contact and demo pages: titles, intro, button, success message, side panel, and every field (label, type, required, options, order) |
+| Inquiries | submissions from the forms: read, set status (new / read / replied / spam / archived), add internal notes, delete |
+| Interface text | every small label the site shows: button text, aria labels, empty states, form errors, footer column titles, type labels (`lummet_ui_strings`) |
 | Brand profiles / Updates / Publications / Partners / Authors / Pages | the content pages, each with SEO title, description and social image |
 
 Section kinds: `text`, `features`, `steps`, `checklist`, `panel`, `brands`,
 `stats`, `updates`, `insights`, `partners`, `faq`, `cta`, `contact`.
+
+## Nothing hardcoded: where each kind of text lives
+
+| Kind of text | Lives in |
+|---|---|
+| Page and section copy, hero, footer text, list-page titles | `lummet_site_settings`, `lummet_homepage_sections`, `lummet_pages` |
+| Cards, steps, checklist items, AI panel items | `lummet_features` |
+| Navigation (header, buttons, footer columns) | `lummet_nav_links` |
+| Contact / demo copy and every form field | `lummet_forms`, `lummet_form_fields` |
+| Small interface text (labels, errors, empty states, ARIA) | `lummet_ui_strings` |
+| Brands, updates, insights, partners, authors, FAQs | their own tables |
+
+`test/forms.test.js` enforces this: it fails if a template contains literal
+text outside `{{ }}`, if a template uses an interface key that is not seeded,
+or if a client script contains a label. The only text outside the database is
+the last-resort "Temporarily unavailable" page, which is shown when the
+database itself cannot be read.
+
+## Contact and demo forms
+
+- **Submit flow:** POST to the same URL -> validate against the database field
+  definitions -> store in `lummet_inquiries` -> 303 redirect to `?sent=1`
+  (refreshing never resubmits). Errors re-render the form with the visitor's
+  text kept and each message coming from `lummet_ui_strings`.
+- **Spam and abuse controls, no third-party service and no cookies:** a hidden
+  honeypot field (bots get a fake success and nothing is stored); a same-origin
+  check on every POST (`Origin` / `Sec-Fetch-Site`); a per-visitor hourly limit
+  (hashed IP; default 5, change with the `inquiry_rate_limit_per_hour` setting);
+  size and length limits; select values must be one of the stored options.
+- **Privacy:** only the submitted fields and a one-way IP hash are stored. Delete
+  an inquiry from Lummet Site -> Inquiries when it is no longer needed.
+- **Notification (optional):** `wrangler secret put INQUIRY_WEBHOOK_URL` with an
+  `https://` Slack, Discord or other JSON webhook URL. Each new inquiry sends one
+  short message. A failing webhook never loses the inquiry. Without it, check
+  Lummet Site -> Inquiries (the app does not send email).
+- **New forms:** Forms -> New (key `partners` -> `/forms/partners`), then add rows
+  in Form fields with the same form key. A draft form returns 404.
+
+## Footer at the bottom
+
+`body` is a full-height flex column (`min-height: 100dvh`) and `<main>` has
+`flex: 1 0 auto`, so the footer is flush with the bottom of the screen on a
+short page and follows the content on a long one, at any screen size.
 
 ## The "real content" rules the code enforces
 
 - Drafts are never queried by a public route.
 - A section whose data source has no published rows is not rendered.
 - A navigation link with `visible_when` = `has_partners` (etc.) hides until that content exists; `/#anchor` links hide when the section is not on the page.
-- Contact block, footer address and the "Get a Demo" buttons hide when no contact email is configured (`contact_email` setting, else the `CONTACT_EMAIL` var).
+- Every button and link is checked against what is published (`links.js`): a link to `/brands`, `/partners`, `/demo`, a page or a homepage anchor disappears when its destination would be empty, a 404, or absent from the page.
+- The contact section links to the contact form when one is published; an email address is shown only if `contact_email` (or the `CONTACT_EMAIL` var) is set.
 - The stats strip shows counts read from the database, never typed numbers.
 - A brand without a `logo_url` shows an initials tile, not a fabricated logo.
 - CMS URLs are restricted to `http(s)`, `mailto`, site-relative and `#`; CMS HTML is sanitized; accent colours are validated before reaching CSS.

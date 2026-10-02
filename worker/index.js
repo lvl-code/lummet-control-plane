@@ -1697,6 +1697,11 @@ export default {
         const guard = await requirePermission("cms", cmsNewParams.resource, "create");
         if (guard) return guard;
 
+        // Some lists (e.g. Inquiries) hold records created by visitors, never by hand.
+        if (getCmsResourceConfig(cmsNewParams.resource).supportsCreate === false) {
+          return redirect(`/cms/${cmsNewParams.resource}?flash=This+list+cannot+be+added+to+by+hand&flash_type=error`);
+        }
+
         if (method === "GET") return html(await renderCmsForm(env, admin, cmsNewParams.resource, null, null));
 
         if (method === "POST") {

@@ -10,10 +10,9 @@ import { sanitizeHtml } from "./sanitize.js";
 import { formatDate, stripTags, truncate, readingMinutes, initials, safeUrl, hostOf, isExternal } from "./format.js";
 import { iconSvg } from "./icons.js";
 
-const TYPE_LABELS = { blog: "Article", press: "In the press", report: "Report" };
-
-export function typeLabel(type) {
-  return TYPE_LABELS[type] || "Article";
+/** Label for a publication type, from lummet_ui_strings (type_<type>); unknown types fall back to type_blog. */
+export function typeLabel(ui, type) {
+  return (ui && (ui[`type_${type}`] || ui.type_blog)) || "";
 }
 
 export function brandModel(row) {
@@ -64,13 +63,13 @@ export function updateModel(row) {
   return contentBase(row, "/updates");
 }
 
-export function publicationModel(row) {
+export function publicationModel(row, ui) {
   const base = contentBase(row, "/insights");
   const sourceUrl = safeUrl(row.source_url);
   return {
     ...base,
     type: row.publication_type,
-    type_label: typeLabel(row.publication_type),
+    type_label: typeLabel(ui, row.publication_type),
     is_press: row.publication_type === "press",
     source_name: row.source_name || "",
     source_url: sourceUrl,

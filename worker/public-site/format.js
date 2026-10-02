@@ -107,3 +107,8 @@ export function jsonForScript(value) {
     .replace(/\u2028/g, "\\u2028")
     .replace(/\u2029/g, "\\u2029");
 }
+
+/** "{center} has {count}" + { center, count } -> text. Unknown tokens are left empty, never "undefined". */
+export function fill(template, vars = {}) {
+  return String(template || "").replace(/\{(\w+)\}/g, (_, k) => (vars[k] === undefined || vars[k] === null ? "" : String(vars[k])));
+}

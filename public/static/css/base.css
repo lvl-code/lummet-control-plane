@@ -3,7 +3,12 @@
    ===================================================== */
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h) + 16px); }
+html { height: 100%; }
 body {
+  /* Sticky footer: the page is a full-height column; <main> grows to fill
+     whatever the content leaves, so the footer sits at the bottom of the
+     viewport on short pages and after the content on long ones. */
+  min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column;
   margin: 0; background: var(--bg); color: var(--ink);
   font-family: var(--font-sans); font-size: var(--fs-base); line-height: 1.65;
   -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
@@ -26,6 +31,8 @@ button { font: inherit; }
 .container { width: 100%; max-width: var(--container); margin-inline: auto; padding-inline: clamp(1rem, 4vw, 2rem); }
 .narrow { max-width: var(--narrow); }
 .container.narrow { max-width: calc(var(--narrow) + 4rem); }
+main { flex: 1 0 auto; width: 100%; }
+.site-footer { flex-shrink: 0; }
 .skip-link { position: absolute; left: -9999px; top: 8px; background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; z-index: 200; }
 .skip-link:focus { left: 8px; }
 .hide-mobile { display: none !important; }
@@ -64,7 +71,7 @@ button { font: inherit; }
 }
 
 /* ---- Footer ---- */
-.site-footer { border-top: 1px solid var(--border); background: var(--bg-soft); padding: var(--space-8) 0 calc(var(--space-6) + env(safe-area-inset-bottom)); margin-top: var(--space-8); }
+.site-footer { border-top: 1px solid var(--border); background: var(--bg-soft); padding: var(--space-8) 0 calc(var(--space-6) + env(safe-area-inset-bottom)); margin-top: 0; }
 .footer-grid { display: grid; gap: var(--space-6); grid-template-columns: 1fr; }
 .footer-brand p { max-width: 34ch; color: var(--ink-dim); margin-top: var(--space-3); }
 .footer-mail { font-weight: 600; font-size: var(--fs-sm); }

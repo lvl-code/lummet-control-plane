@@ -1,6 +1,6 @@
 name: Migrate Lummet Control Plane DB (public site, manual)
 
-# Manual only. Applies migrations 0006 and 0007 to the REMOTE D1 database,
+# Manual only. Applies migrations 0006, 0007 and 0008 to the REMOTE D1 database,
 # after exporting a backup. 0006 is skipped if it is already applied (it uses
 # ALTER TABLE ADD COLUMN, which cannot be run twice); 0007 is idempotent.
 # Needs a CLOUDFLARE_API_TOKEN secret that is allowed to edit D1.
@@ -50,6 +50,9 @@ jobs:
       - name: Apply 0007 (safe to re-run)
         run: wrangler d1 execute "$DB" --remote --file=migrations/0007_seed_lummet_content.sql
 
+      - name: Apply 0008 (contact and demo forms, interface text; safe to re-run)
+        run: wrangler d1 execute "$DB" --remote --file=migrations/0008_contact_demo_forms.sql
+
       - name: Show what is now published
         run: |
-          wrangler d1 execute "$DB" --remote --command "SELECT (SELECT COUNT(*) FROM lummet_brands WHERE status='published') AS brands, (SELECT COUNT(*) FROM lummet_updates WHERE status='published') AS updates, (SELECT COUNT(*) FROM lummet_publications WHERE status='published') AS insights, (SELECT COUNT(*) FROM lummet_pages WHERE status='published') AS pages"
+          wrangler d1 execute "$DB" --remote --command "SELECT (SELECT COUNT(*) FROM lummet_brands WHERE status='published') AS brands, (SELECT COUNT(*) FROM lummet_updates WHERE status='published') AS updates, (SELECT COUNT(*) FROM lummet_publications WHERE status='published') AS insights, (SELECT COUNT(*) FROM lummet_pages WHERE status='published') AS pages, (SELECT COUNT(*) FROM lummet_forms WHERE status='published') AS forms, (SELECT COUNT(*) FROM lummet_ui_strings) AS ui_strings"

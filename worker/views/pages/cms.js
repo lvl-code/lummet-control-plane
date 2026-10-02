@@ -64,9 +64,9 @@ export async function renderCmsList(env, admin, resourceKey, flash) {
     <p class="subtitle">Lummet Site · ${escapeHtml(config.label)} — content shown on lummet.com itself.</p>
     ${flashHtml(flash)}
     <div class="card">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+      ${config.supportsCreate === false ? "" : `<div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
         <a class="btn btn-primary" href="/cms/${resourceKey}/new">+ New ${escapeHtml(config.label.replace(/s$/, ""))}</a>
-      </div>
+      </div>`}
       <table>
         <thead><tr>${headerCells}<th></th></tr></thead>
         <tbody>${bodyRows}</tbody>
@@ -109,6 +109,14 @@ async function loadOptionsFor(env, field) {
 
 function renderField(field, value, options) {
   const val = value === undefined || value === null ? "" : value;
+
+  if (field.readOnly) {
+    const rows = field.type === "textarea" ? Math.min(14, Math.max(4, String(val).split("\n").length + 1)) : 1;
+    return `<label>${escapeHtml(field.label)}</label>` +
+      (field.type === "textarea"
+        ? `<textarea rows="${rows}" readonly>${escapeHtml(val)}</textarea>`
+        : `<input type="text" value="${escapeHtml(val)}" readonly />`);
+  }
 
   if (field.type === "textarea") {
     return `<label>${escapeHtml(field.label)}${field.hint ? ` <span style="color:var(--text-dim);font-weight:400;">— ${escapeHtml(field.hint)}</span>` : ""}</label>
@@ -211,6 +219,7 @@ const SETTING_LABELS = {
   updates_intro: "/updates page intro",
   insights_title: "/insights page title",
   insights_intro: "/insights page intro",
+  inquiry_rate_limit_per_hour: "Form submissions allowed per visitor per hour",
   partners_title: "/partners page title",
   partners_intro: "/partners page intro",
   logo_url: "Logo image URL",

@@ -156,7 +156,13 @@ wrangler d1 execute lummet-control-plane-db --file=migrations/0004_lummet_homepa
 wrangler d1 execute lummet-control-plane-db --file=migrations/0005_lummet_ai_management.sql --remote
 wrangler d1 execute lummet-control-plane-db --file=migrations/0006_public_site_schema.sql --remote
 wrangler d1 execute lummet-control-plane-db --file=migrations/0007_seed_lummet_content.sql --remote
+wrangler d1 execute lummet-control-plane-db --file=migrations/0008_contact_demo_forms.sql --remote
 ```
+
+`0008` adds the contact/demo forms, the inquiries table and the interface-text
+table. It is safe to re-run (it never overwrites an admin edit). Optional: set
+`INQUIRY_WEBHOOK_URL` (`wrangler secret put INQUIRY_WEBHOOK_URL`) to get a
+message for every new inquiry.
 
 `0006` makes the public website database-driven (brand category, per-page
 SEO columns, homepage section kinds, and the `lummet_features`,
