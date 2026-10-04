@@ -169,8 +169,9 @@ export async function handlePublicRoute({ request, env, ctx: execCtx, isAdmin })
   if (!isPublicPath(path)) return null;
   if (path.startsWith("/static/")) return serveStatic(request, env);
 
-  // "/" is shared with the signed-in dashboard: admins keep seeing that.
-  if (path === "/" && (await isAdmin())) return null;
+  // "/" is the public homepage for everyone, signed in or not. The staff
+  // dashboard lives at /dashboard. (`isAdmin` is still accepted by this
+  // function so existing callers keep working; it is no longer consulted.)
 
   // A page showing "sent" state, or anything carrying form state, is never shared.
   const cache = typeof caches !== "undefined" && !url.searchParams.has("sent") ? caches.default : null;

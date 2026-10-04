@@ -29,7 +29,7 @@ const NAV = [
     section: "Workspace",
     icon: "workspace",
     items: [
-      { label: "Overview", href: "/", key: "dashboard" },
+      { label: "Overview", href: "/dashboard", key: "dashboard" },
       { label: "AI Chat", href: "/ai", key: "ai-chat" },
       { label: "AI Tools", href: "/content/ai-tools", key: "content-ai-tools", area: "tenant", resource: "ai_tools" }
     ]
@@ -307,7 +307,7 @@ export async function renderShell({ title, activeKey, admin, bodyHtml, env }) {
   <div class="app">
     <aside class="sidebar" id="sidebar" aria-label="Main navigation">
       <div class="sidebar-head">
-        <a class="brand" href="/"><span class="dot"></span> Lummet</a>
+        <a class="brand" href="/dashboard"><span class="dot"></span> Lummet</a>
         <button type="button" class="icon-btn nav-close" id="nav-close" aria-label="Close menu">${ICONS.close}</button>
       </div>
       <div class="nav-filter-wrap">
@@ -324,6 +324,7 @@ export async function renderShell({ title, activeKey, admin, bodyHtml, env }) {
         <button type="button" class="icon-btn" id="nav-toggle" aria-controls="sidebar" aria-expanded="true" aria-label="Toggle menu">${ICONS.menu}</button>
         <div class="page-crumb">Lummet <span aria-hidden="true">/</span> <strong>${escapeHtml(title)}</strong></div>
         <div class="topbar-right">
+          <a class="btn btn-secondary btn-small view-site" href="/" target="_blank" rel="noopener">View site</a>
           <button type="button" class="icon-btn theme-toggle" id="theme-toggle" aria-label="Switch color theme"><span class="icon sun">${ICONS.sun}</span><span class="icon moon">${ICONS.moon}</span></button>
           ${admin ? renderUserMenu(admin, isSuper) : ""}
         </div>

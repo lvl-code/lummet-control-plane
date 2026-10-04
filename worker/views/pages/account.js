@@ -35,7 +35,7 @@ export async function renderChangePasswordPage(env, admin, error) {
       </div>
       <div style="display:flex;gap:8px;margin-top:16px;">
         <button type="submit" class="btn btn-primary">Save new password</button>
-        ${forced ? "" : `<a class="btn btn-secondary" href="/">Cancel</a>`}
+        ${forced ? "" : `<a class="btn btn-secondary" href="/dashboard">Cancel</a>`}
       </div>
     </form>`;
 

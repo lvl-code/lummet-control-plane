@@ -291,7 +291,7 @@ export default {
       if (path === "/login") {
         const existingAdmin = await auth.getCurrentAdmin(request, env);
         if (existingAdmin && method === "GET") {
-          return redirect("/");
+          return redirect("/dashboard");
         }
 
         const bootstrapMode = !(await auth.hasAnyAdmins(env));
@@ -335,7 +335,7 @@ export default {
             });
 
             if (!loginResult.ok) return redirect("/login");
-            return redirect("/", { "Set-Cookie": loginResult.cookie });
+            return redirect("/dashboard", { "Set-Cookie": loginResult.cookie });
           }
 
           const loginResult = await auth.authenticateAdmin(env, form.email, form.password, authIpHash);
@@ -354,7 +354,7 @@ export default {
               renderLoginPage({ mode: "login", error: describeAuthError(loginResult.error) })
             );
           }
-          return redirect("/", { "Set-Cookie": loginResult.cookie });
+          return redirect("/dashboard", { "Set-Cookie": loginResult.cookie });
         }
       }
 
@@ -429,7 +429,7 @@ export default {
         if (isApiRoute) return json({ success: false, error: "forbidden" }, 403);
         return html(`<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;">
           <h1>403 — Forbidden</h1><p>You don't have access to this. Ask a super admin to grant it.</p>
-          <a href="/">Back to dashboard</a></body></html>`, 403);
+          <a href="/dashboard">Back to dashboard</a></body></html>`, 403);
       }
 
       /** Super-admin-only screens: tenant registry, credentials, other admins. */
@@ -1557,7 +1557,7 @@ export default {
       // DASHBOARD PAGES (HTML)
       // ===============================================
 
-      if (method === "GET" && path === "/") {
+      if (method === "GET" && path === "/dashboard") {
         return html(await renderDashboardHome(env, admin));
       }
 
@@ -1592,7 +1592,7 @@ export default {
           if (!result.ok) {
             return html(await renderChangePasswordPage(env, admin, describePasswordError(result.error)));
           }
-          return redirect("/");
+          return redirect("/dashboard");
         }
       }
 
@@ -1865,7 +1865,7 @@ async function handleResourceRoutes(request, env, admin, path, method, requestId
   const forbiddenHtml = () =>
     html(`<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;">
       <h1>403 — Forbidden</h1><p>You don't have access to this. Ask a super admin to grant it.</p>
-      <a href="/">Back to dashboard</a></body></html>`, 403);
+      <a href="/dashboard">Back to dashboard</a></body></html>`, 403);
   const forbiddenJson = () => json({ success: false, error: "forbidden" }, 403);
 
   if (!(await canAccessTenant(env, admin, admin.activeTenantId))) {

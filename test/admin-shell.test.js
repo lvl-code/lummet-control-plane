@@ -6,7 +6,7 @@ import { renderShell, NAV } from "../worker/views/layout.js";
 // Every link the sidebar offered before the grouped redesign. The redesign
 // moves links between groups; it must never drop or add one.
 const PREVIOUS_HREFS = [
-  "/",
+  "/dashboard",
   "/ai",
   "/tenants",
   "/tenants/new",
@@ -145,7 +145,7 @@ describe("renderShell", () => {
   test("a staff admin with no grants sees only always-visible links, and no super-admin groups", async () => {
     const html = await renderShell({ title: "Overview", activeKey: "dashboard", admin: staff, bodyHtml: "", env });
     const links = hrefsIn(html);
-    assert.deepEqual([...links].sort(), ["/", "/ai"]);
+    assert.deepEqual([...links].sort(), ["/ai", "/dashboard"]);
     assert.doesNotMatch(html, /data-group="tenants"/);
     assert.doesNotMatch(html, /data-group="platform"/);
     assert.doesNotMatch(html, /\/platform\/credentials/);

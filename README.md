@@ -441,6 +441,12 @@ The public site (`/`, `/brands`, `/updates`, `/insights`, `/partners`,
   is unchanged; only the grouping and look are new. See `docs/DASHBOARD_UI.md`.
 - No migration and no new secret.
 
+### Phase 12.1 — Signed-in staff can browse the public site
+
+- `/` is the public homepage for everyone, signed in or not. The staff dashboard moved to
+  **`/dashboard`** (sign-in, password change and the 403 page now send you there).
+- The dashboard top bar has a **View site** link. Bookmarks to the old dashboard address `/` now show the public homepage.
+
 ## Deployment
 
 See **DEPLOYMENT.md** in this same folder for the full, step-by-step

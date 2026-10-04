@@ -110,11 +110,12 @@ test('non-GET requests are never handled by the public router', async () => {
   assert.equal(await handlePublicRoute({ request, env, ctx: {}, isAdmin: async () => false }), null);
 });
 
-test('"/" falls through to the dashboard for a signed-in admin', async () => {
+test('"/" is the public homepage for a signed-in admin too', async () => {
   const env = createPublicEnv();
   const request = new Request('https://lummet.test/');
   const res = await handlePublicRoute({ request, env, ctx: {}, isAdmin: async () => true });
-  assert.equal(res, null);
+  assert.equal(res.status, 200);
+  assert.match(await res.text(), /<html/);
 });
 
 test('templates are never served as static URLs', async () => {

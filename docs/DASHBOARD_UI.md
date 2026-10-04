@@ -39,3 +39,9 @@ update `PREVIOUS_HREFS` in `test/admin-shell.test.js` when you add a page on pur
 
 All colors are tokens at the top of `STYLES` (`:root` for dark, `:root[data-theme="light"]`).
 Legacy names used by older pages (`--success`, `--warning`, `--border-color`) are aliases.
+
+## Addresses
+
+The public website owns `/` and every public path for all visitors, including signed-in staff.
+The dashboard is at `/dashboard` and still requires a session (anonymous requests go to `/login`).
+The top bar has a **View site** link that opens the public site in a new tab.
