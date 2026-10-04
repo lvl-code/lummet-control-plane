@@ -35,7 +35,7 @@ export function createPublicEnv({ contactEmail = 'hello@example.test' } = {}) {
 
 export async function get(handle, env, path, init = {}) {
   const request = new Request(`https://lummet.test${path}`, { method: 'GET', ...init });
-  const res = await handle({ request, env, ctx: { waitUntil() {} }, isAdmin: async () => false });
+  const res = await handle({ request, env, ctx: { waitUntil() {} } });
   return res;
 }
 
@@ -47,5 +47,5 @@ export async function post(handle, env, path, fields = {}, { headers = {}, ctx }
     headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'https://lummet.test', ...headers },
     body
   });
-  return handle({ request, env, ctx: ctx || { waitUntil() {} }, isAdmin: async () => false });
+  return handle({ request, env, ctx: ctx || { waitUntil() {} } });
 }

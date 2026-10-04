@@ -81,3 +81,35 @@ describe('header link for signed-in staff', () => {
     assert.deepEqual(rows.map((r) => [r.ui_key, r.value]), [['signed_in_href', '/dashboard'], ['signed_in_label', 'Console']]);
   });
 });
+
+describe('migration 0010 (flattened select options)', () => {
+  const sqlFile = new URL('../migrations/0010_repair_select_options.sql', import.meta.url);
+  const run = async (db) => {
+    const sql = readFileSync(sqlFile, 'utf8').split('\n').filter((l) => !l.startsWith('--')).join('\n');
+    for (const stmt of sql.split(';').map((x) => x.trim()).filter(Boolean)) await db.prepare(stmt).run();
+  };
+  const opts = async (db, form, field) => (await db.prepare(`SELECT options FROM lummet_form_fields WHERE form_key=? AND field_key=?`).bind(form, field).first()).options;
+
+  test('restores one option per line, is safe to run twice, and leaves edited lists alone', async () => {
+    const db = createTestDb();
+    applyMigrations(db);
+    await db.prepare(`UPDATE lummet_form_fields SET options = 'Platform question Partnership opportunity Technology licensing Other' WHERE form_key='contact' AND field_key='topic'`).run();
+    await db.prepare(`UPDATE lummet_form_fields SET options = '1 2 to 5 6 to 10 More than 10' WHERE form_key='demo' AND field_key='properties'`).run();
+    await run(db);
+    await run(db);
+    assert.deepEqual((await opts(db, 'contact', 'topic')).split('\n'), ['Platform question', 'Partnership opportunity', 'Technology licensing', 'Other']);
+    assert.deepEqual((await opts(db, 'demo', 'properties')).split('\n'), ['1', '2 to 5', '6 to 10', 'More than 10']);
+    await db.prepare(`UPDATE lummet_form_fields SET options = 'A' || char(10) || 'B' WHERE form_key='contact' AND field_key='topic'`).run();
+    await run(db);
+    assert.equal(await opts(db, 'contact', 'topic'), 'A\nB');
+  });
+
+  test('the seeded lists are already correct and stay unchanged', async () => {
+    const db = createTestDb();
+    applyMigrations(db);
+    const before = await opts(db, 'contact', 'topic');
+    await run(db);
+    assert.equal(await opts(db, 'contact', 'topic'), before);
+    assert.equal(before.split('\n').length, 4);
+  });
+});

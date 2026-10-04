@@ -129,7 +129,7 @@ describe('dashboard: inquiries, forms, form fields, interface text', () => {
     const save = await req('POST', `/cms/ui_strings/${row.id}/edit`, sid, { ui_key: 'view_profile', value: 'Open profile', group_key: 'cards' });
     assert.equal(save.status, 302, await save.clone().text());
     const page = await handlePublicRoute({
-      request: new Request('https://lummet.test/brands'), env, ctx: { waitUntil() {} }, isAdmin: async () => false
+      request: new Request('https://lummet.test/brands'), env, ctx: { waitUntil() {} }
     });
     assert.match(await page.text(), /Open profile/);
   });
@@ -142,7 +142,7 @@ describe('dashboard: inquiries, forms, form fields, interface text', () => {
     });
     assert.equal(save.status, 302, await save.clone().text());
     const page = await handlePublicRoute({
-      request: new Request('https://lummet.test/contact'), env, ctx: { waitUntil() {} }, isAdmin: async () => false
+      request: new Request('https://lummet.test/contact'), env, ctx: { waitUntil() {} }
     });
     assert.match(await page.text(), /Phone number/);
   });

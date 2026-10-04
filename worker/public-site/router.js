@@ -4,7 +4,7 @@
 // authenticated admin routes. Returns a Response for a public route
 // and null for anything else, so the admin app is untouched.
 //
-//   /                    homepage (anonymous visitors only)
+//   /                    homepage (everyone, signed in or not)
 //   /brands  /brands/:slug
 //   /updates /updates/:slug
 //   /insights /insights/:slug
@@ -142,9 +142,9 @@ async function resolve(ctx) {
 }
 
 /**
- * @param {{request: Request, env: object, ctx: object, isAdmin: () => Promise<boolean>}} args
+ * @param {{request: Request, env: object, ctx: object}} args
  */
-export async function handlePublicRoute({ request, env, ctx: execCtx, isAdmin }) {
+export async function handlePublicRoute({ request, env, ctx: execCtx }) {
   const method = request.method.toUpperCase();
   if (method !== "GET" && method !== "HEAD" && method !== "POST") return null;
 
@@ -170,8 +170,7 @@ export async function handlePublicRoute({ request, env, ctx: execCtx, isAdmin })
   if (path.startsWith("/static/")) return serveStatic(request, env);
 
   // "/" is the public homepage for everyone, signed in or not. The staff
-  // dashboard lives at /dashboard. (`isAdmin` is still accepted by this
-  // function so existing callers keep working; it is no longer consulted.)
+  // dashboard lives at /dashboard.
 
   // A page showing "sent" state, or anything carrying form state, is never shared.
   const cache = typeof caches !== "undefined" && !url.searchParams.has("sent") ? caches.default : null;

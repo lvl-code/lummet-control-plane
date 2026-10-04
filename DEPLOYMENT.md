@@ -158,7 +158,10 @@ wrangler d1 execute lummet-control-plane-db --file=migrations/0006_public_site_s
 wrangler d1 execute lummet-control-plane-db --file=migrations/0007_seed_lummet_content.sql --remote
 wrangler d1 execute lummet-control-plane-db --file=migrations/0008_contact_demo_forms.sql --remote
 wrangler d1 execute lummet-control-plane-db --file=migrations/0009_signed_in_header.sql --remote
+wrangler d1 execute lummet-control-plane-db --file=migrations/0010_repair_select_options.sql --remote
 ```
+
+`0010` repairs the contact and demo dropdowns if their option lists lost their line breaks (safe to re-run).
 
 `0009` adds the two interface strings for the signed-in header link (safe to re-run; run it before pushing, though the page also works without it).
 

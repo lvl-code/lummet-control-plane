@@ -107,13 +107,13 @@ test('unknown slugs and unknown paths', async () => {
 test('non-GET requests are never handled by the public router', async () => {
   const env = createPublicEnv();
   const request = new Request('https://lummet.test/', { method: 'POST' });
-  assert.equal(await handlePublicRoute({ request, env, ctx: {}, isAdmin: async () => false }), null);
+  assert.equal(await handlePublicRoute({ request, env, ctx: {} }), null);
 });
 
 test('"/" is the public homepage for a signed-in admin too', async () => {
   const env = createPublicEnv();
   const request = new Request('https://lummet.test/');
-  const res = await handlePublicRoute({ request, env, ctx: {}, isAdmin: async () => true });
+  const res = await handlePublicRoute({ request, env, ctx: {} });
   assert.equal(res.status, 200);
   assert.match(await res.text(), /<html/);
 });

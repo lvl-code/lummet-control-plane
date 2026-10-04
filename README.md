@@ -461,3 +461,9 @@ covers how to run it.
 - Public pages stay edge-cached and identical for everyone. A small script (`public/static/js/session.js`) asks `GET /session-status`, which answers `{ "signedIn": true|false }`, is never cached, and does not touch the database when there is no session cookie.
 - The label and target are interface text in the database (`signed_in_label`, `signed_in_href`), editable under Interface text.
 - **Migration:** `0009_signed_in_header.sql` (safe to re-run). See `docs/RELEASE_SIGNED_IN_HEADER.md`.
+
+## Phase 12.3 — maintenance release
+
+- **Migration `0010_repair_select_options.sql`** (safe to re-run): restores one option per line for the contact "topic" and demo "properties" dropdowns if their line breaks were lost. Lists that already have line breaks, including ones edited in the dashboard, are left alone.
+- **CI:** both workflows run on `ubuntu-24.04` (instead of `ubuntu-latest`, which moves to a newer Ubuntu on 2026-10-19) and use `actions/checkout@v5` and `actions/setup-node@v5`.
+- **Cleanup:** outdated comments about the dashboard living at `/` were corrected in `worker/index.js`, and the unused `isAdmin` argument was removed from `handlePublicRoute`. No behavior change. See `docs/RELEASE_MAINTENANCE.md`.

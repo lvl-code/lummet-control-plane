@@ -1,6 +1,6 @@
 name: Migrate Lummet Control Plane DB (public site, manual)
 
-# Manual only. Applies migrations 0006, 0007, 0008 and 0009 to the REMOTE D1 database,
+# Manual only. Applies migrations 0006, 0007, 0008, 0009 and 0010 to the REMOTE D1 database,
 # after exporting a backup. 0006 is skipped if it is already applied (it uses
 # ALTER TABLE ADD COLUMN, which cannot be run twice); 0007 is idempotent.
 # Needs a CLOUDFLARE_API_TOKEN secret that is allowed to edit D1.
@@ -10,7 +10,7 @@ on:
 
 jobs:
   migrate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -18,10 +18,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
 
@@ -55,6 +55,9 @@ jobs:
 
       - name: Apply 0009 (header link for signed-in staff; safe to re-run)
         run: wrangler d1 execute "$DB" --remote --file=migrations/0009_signed_in_header.sql
+
+      - name: Apply 0010 (repair flattened select options; safe to re-run)
+        run: wrangler d1 execute "$DB" --remote --file=migrations/0010_repair_select_options.sql
 
       - name: Show what is now published
         run: |

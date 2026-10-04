@@ -20,8 +20,8 @@
 //
 // Public marketing site (unauthenticated, rendered from D1 by
 // worker/public-site/, templates + assets in public/):
-//   GET  /            (public homepage for anonymous visitors;
-//                       signed-in admins see the dashboard instead)
+//   GET  /            (public homepage, same for everyone, signed in or not)
+//   GET  /session-status  ({ signedIn } for the header link; never cached)
 //   GET  /brands, /brands/:slug, /updates, /updates/:slug,
 //        /insights, /insights/:slug, /partners, /authors/:slug
 //   GET  /p/:slug, /about, /security, /privacy, /terms
@@ -29,7 +29,7 @@
 //
 // Dashboard pages (Phase 4, new):
 //   GET/POST /login
-//   GET  /             (authenticated dashboard, same path as above)
+//   GET  /dashboard    (authenticated staff dashboard)
 //   GET  /tenants
 //   GET/POST /tenants/new
 //   GET  /tenants/health
@@ -382,34 +382,23 @@ export default {
       }
 
       // ---------------------------------------------
-      // Public marketing site (unauthenticated, HTML)
+      // Public marketing site (HTML)
       //
-      // "/" is shared by two very different audiences: an
-      // anonymous visitor should see the public Lummet
-      // marketing homepage, while a signed-in admin should
-      // keep seeing the authenticated dashboard exactly as
-      // before. Rather than move the dashboard off "/" (which
-      // would change an existing route), an unauthenticated
-      // visitor is served the public page here and everything
-      // else falls through unchanged to the dashboard route
-      // further down, which still requires a session.
-      //
-      // /privacy and /terms are simple public placeholder pages
-      // linked from the homepage footer.
+      // Everyone, signed in or not, sees the same public pages;
+      // the staff dashboard lives at /dashboard and below, which
+      // are reached further down and still require a session.
       // ---------------------------------------------
 
       // The public site lives in worker/public-site/ (router.js). It
       // owns "/", /brands, /updates, /insights, /partners, /authors/:slug,
-      // /p/:slug, /about /security /privacy /terms, /sitemap.xml,
-      // /robots.txt and /static/*. It returns null for any path it does not
-      // own, and for "/" when an admin is signed in, so the authenticated
-      // dashboard route below is reached exactly as before.
+      // /contact, /demo, /forms/:key, /p/:slug, /about /security /privacy
+      // /terms, /sitemap.xml, /robots.txt and /static/*. It returns null for
+      // any path it does not own, so the dashboard routes below are reached.
       {
         const publicResponse = await handlePublicRoute({
           request,
           env,
-          ctx,
-          isAdmin: async () => Boolean(await auth.getCurrentAdmin(request, env))
+          ctx
         });
         if (publicResponse) return publicResponse;
       }
