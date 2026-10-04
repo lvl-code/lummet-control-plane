@@ -169,3 +169,12 @@ found. Do not add inline `<script>` blocks to templates; add a file in
 `npm test` runs `test/public-site.test.js` against the real migrations, the real
 seed, the real templates and the real router (D1 -> `node:sqlite`, ASSETS ->
 the `public/` folder).
+
+## Header link for signed-in staff
+
+`header.html` carries `data-signed-in-label` and `data-signed-in-href`, filled from
+`lummet_ui_strings` (`signed_in_label`, `signed_in_href`). `public/static/js/session.js` calls
+`GET /session-status` (same origin, `no-store`). When it returns `{"signedIn":true}` every header link
+that points to `/login` (desktop and mobile menu) gets that label and target. If the strings are
+missing, the request fails, or the visitor is not signed in, the page is left as rendered.
+The endpoint returns only the flag, and the real access checks on `/dashboard` are unchanged.

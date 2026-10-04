@@ -1,6 +1,6 @@
 name: Migrate Lummet Control Plane DB (public site, manual)
 
-# Manual only. Applies migrations 0006, 0007 and 0008 to the REMOTE D1 database,
+# Manual only. Applies migrations 0006, 0007, 0008 and 0009 to the REMOTE D1 database,
 # after exporting a backup. 0006 is skipped if it is already applied (it uses
 # ALTER TABLE ADD COLUMN, which cannot be run twice); 0007 is idempotent.
 # Needs a CLOUDFLARE_API_TOKEN secret that is allowed to edit D1.
@@ -52,6 +52,9 @@ jobs:
 
       - name: Apply 0008 (contact and demo forms, interface text; safe to re-run)
         run: wrangler d1 execute "$DB" --remote --file=migrations/0008_contact_demo_forms.sql
+
+      - name: Apply 0009 (header link for signed-in staff; safe to re-run)
+        run: wrangler d1 execute "$DB" --remote --file=migrations/0009_signed_in_header.sql
 
       - name: Show what is now published
         run: |

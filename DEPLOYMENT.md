@@ -157,7 +157,10 @@ wrangler d1 execute lummet-control-plane-db --file=migrations/0005_lummet_ai_man
 wrangler d1 execute lummet-control-plane-db --file=migrations/0006_public_site_schema.sql --remote
 wrangler d1 execute lummet-control-plane-db --file=migrations/0007_seed_lummet_content.sql --remote
 wrangler d1 execute lummet-control-plane-db --file=migrations/0008_contact_demo_forms.sql --remote
+wrangler d1 execute lummet-control-plane-db --file=migrations/0009_signed_in_header.sql --remote
 ```
+
+`0009` adds the two interface strings for the signed-in header link (safe to re-run; run it before pushing, though the page also works without it).
 
 `0008` adds the contact/demo forms, the inquiries table and the interface-text
 table. It is safe to re-run (it never overwrites an admin edit). Optional: set

@@ -454,3 +454,10 @@ guide covering both the control plane and the tenant-side Super API
 (including how they fit together, adding another tenant, day-to-day
 operation, and rollback). This README covers what's built; that file
 covers how to run it.
+
+## Phase 12.2 — "Sign in" becomes "Dashboard" for signed-in staff
+
+- The public header shows **Dashboard** (linking to `/dashboard`) instead of **Sign in** when a staff member is signed in, on desktop and in the mobile menu.
+- Public pages stay edge-cached and identical for everyone. A small script (`public/static/js/session.js`) asks `GET /session-status`, which answers `{ "signedIn": true|false }`, is never cached, and does not touch the database when there is no session cookie.
+- The label and target are interface text in the database (`signed_in_label`, `signed_in_href`), editable under Interface text.
+- **Migration:** `0009_signed_in_header.sql` (safe to re-run). See `docs/RELEASE_SIGNED_IN_HEADER.md`.

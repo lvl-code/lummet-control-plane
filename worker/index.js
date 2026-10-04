@@ -359,6 +359,29 @@ export default {
       }
 
       // ---------------------------------------------
+      // GET /session-status — tells the public site whether the visitor
+      // is a signed-in staff member, so the header can show "Dashboard"
+      // instead of "Sign in". Public pages are shared in the edge cache
+      // and cannot differ per visitor, so this tiny per-visitor answer
+      // is fetched separately. It returns only { signedIn: boolean },
+      // is never cached, and does not touch the database when there is
+      // no session cookie.
+      // ---------------------------------------------
+      if ((method === "GET" || method === "HEAD") && path === "/session-status") {
+        const hasCookie = /(?:^|;\s*)lummet_session=/.test(request.headers.get("Cookie") || "");
+        const signedIn = hasCookie ? Boolean(await auth.getCurrentAdmin(request, env)) : false;
+        return new Response(JSON.stringify({ signedIn }), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "private, no-store",
+            "Vary": "Cookie",
+            "X-Content-Type-Options": "nosniff"
+          }
+        });
+      }
+
+      // ---------------------------------------------
       // Public marketing site (unauthenticated, HTML)
       //
       // "/" is shared by two very different audiences: an
