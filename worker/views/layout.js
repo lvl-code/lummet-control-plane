@@ -5,27 +5,39 @@
 // distinct from the tenant admin UI — per the master
 // plan's rule #11 ("visually and structurally separate
 // from the normal tenant admin").
+//
+// Navigation is grouped into collapsible sections behind a
+// menu toggle (docked sidebar on desktop, off-canvas drawer
+// on phones). Styles, icons and client scripts live in
+// shell-assets.js.
 // =====================================================
 
 import { isSuperAdmin, loadPermissionMap, listAccessibleTenants } from "../rbac.js";
+import { ICONS, STYLES, BOOT_SCRIPT, CLIENT_SCRIPT } from "./shell-assets.js";
 
-// Every item below (besides Dashboard/Overview, always visible) can
+// Every item below (besides Overview/AI Chat, always visible) can
 // declare `area` + `resource` to be gated by rbac.js's permission
 // map — a staff admin only ever sees a link if they hold a "read"
 // grant on that area/resource; a super admin sees everything.
-// Items with no `area` (e.g. Tenants/Platform registry actions) are
-// implicitly super-admin-only, since they touch the control plane
-// itself rather than a single tenant's or lummet.com's content.
+// Sections marked superAdminOnly (Tenants, Platform) touch the
+// control plane itself rather than a single tenant's or
+// lummet.com's content. Hiding a link is a convenience only: the
+// route guards in worker/index.js are the real boundary.
 const NAV = [
   {
-    section: "Dashboard",
+    id: "workspace",
+    section: "Workspace",
+    icon: "workspace",
     items: [
       { label: "Overview", href: "/", key: "dashboard" },
-      { label: "AI Chat", href: "/ai", key: "ai-chat" }
+      { label: "AI Chat", href: "/ai", key: "ai-chat" },
+      { label: "AI Tools", href: "/content/ai-tools", key: "content-ai-tools", area: "tenant", resource: "ai_tools" }
     ]
   },
   {
+    id: "tenants",
     section: "Tenants",
+    icon: "tenants",
     superAdminOnly: true,
     items: [
       { label: "All Tenants", href: "/tenants", key: "tenants-all" },
@@ -35,7 +47,9 @@ const NAV = [
     ]
   },
   {
+    id: "content",
     section: "Content",
+    icon: "content",
     items: [
       { label: "Casinos", href: "/content/casinos", key: "content-casinos", area: "tenant", resource: "casinos" },
       { label: "Reviews", href: "/content/reviews", key: "content-reviews", area: "tenant", resource: "reviews" },
@@ -44,20 +58,37 @@ const NAV = [
       { label: "Updates", href: "/content/updates", key: "content-updates", area: "tenant", resource: "updates" },
       { label: "Pages", href: "/content/pages", key: "content-pages", area: "tenant", resource: "pages" },
       { label: "Categories", href: "/content/categories", key: "content-categories", area: "tenant", resource: "categories" },
-      { label: "Countries", href: "/content/countries", key: "content-countries", area: "tenant", resource: "countries" },
+      { label: "Countries", href: "/content/countries", key: "content-countries", area: "tenant", resource: "countries" }
+    ]
+  },
+  {
+    id: "research",
+    section: "Research & Newsroom",
+    icon: "research",
+    items: [
       { label: "Research Zone", href: "/content/research", key: "content-research", area: "tenant", resource: "research" },
+      { label: "Research Sources", href: "/content/research-sources", key: "content-research-sources", area: "tenant", resource: "research-sources" },
       { label: "Newsroom Sections", href: "/content/newsroom-sections", key: "content-newsroom-sections", area: "tenant", resource: "newsroom-sections" },
       { label: "Newsroom Topics", href: "/content/newsroom-topics", key: "content-newsroom-topics", area: "tenant", resource: "newsroom-topics" },
       { label: "Newsroom Entities", href: "/content/newsroom-entities", key: "content-newsroom-entities", area: "tenant", resource: "newsroom-entities" },
-      { label: "Newsroom Series", href: "/content/newsroom-series", key: "content-newsroom-series", area: "tenant", resource: "newsroom-series" },
-      { label: "Research Sources", href: "/content/research-sources", key: "content-research-sources", area: "tenant", resource: "research-sources" },
-      { label: "Country Pages", href: "/content/country-pages", key: "content-country-pages", area: "tenant", resource: "seo_pages" },
-      { label: "Category Countries", href: "/content/category-countries", key: "content-category-countries", area: "tenant", resource: "seo_pages" },
+      { label: "Newsroom Series", href: "/content/newsroom-series", key: "content-newsroom-series", area: "tenant", resource: "newsroom-series" }
+    ]
+  },
+  {
+    id: "seo",
+    section: "SEO & Geo",
+    icon: "seo",
+    items: [
       { label: "SEO Meta", href: "/content/seo", key: "content-seo", area: "tenant", resource: "seo" },
-      { label: "Integrations", href: "/content/integrations", key: "content-integrations", area: "tenant", resource: "postback_configs" },
-      { label: "AI Tools", href: "/content/ai-tools", key: "content-ai-tools", area: "tenant", resource: "ai_tools" },
-      { label: "Support", href: "/content/support", key: "content-support", area: "tenant", resource: "inquiries" },
-      { label: "Newsletter", href: "/content/newsletter", key: "content-newsletter", area: "tenant", resource: "newsletter" },
+      { label: "Country Pages", href: "/content/country-pages", key: "content-country-pages", area: "tenant", resource: "seo_pages" },
+      { label: "Category Countries", href: "/content/category-countries", key: "content-category-countries", area: "tenant", resource: "seo_pages" }
+    ]
+  },
+  {
+    id: "monetization",
+    section: "Monetization",
+    icon: "money",
+    items: [
       { label: "Affiliate Partners", href: "/content/affiliate-partners", key: "content-affiliate-partners", area: "tenant", resource: "affiliate-partners" },
       { label: "Affiliate Programs", href: "/content/affiliate-programs", key: "content-affiliate-programs", area: "tenant", resource: "affiliate-programs" },
       { label: "Affiliate Accounts", href: "/content/affiliate-accounts", key: "content-affiliate-accounts", area: "tenant", resource: "affiliate-accounts" },
@@ -66,13 +97,32 @@ const NAV = [
       { label: "Tracking Links", href: "/content/tracking-links", key: "content-tracking-links", area: "tenant", resource: "tracking-links" },
       { label: "Payment Methods", href: "/content/payment-methods", key: "content-payment-methods", area: "tenant", resource: "payment-methods" },
       { label: "Campaigns", href: "/content/campaigns", key: "content-campaigns", area: "tenant", resource: "campaigns" },
-      { label: "Reports", href: "/content/reports", key: "content-reports", area: "tenant", resource: "reports" },
-      { label: "Alerts", href: "/content/alerts", key: "content-alerts", area: "tenant", resource: "analytics_alerts" },
-      { label: "Analytics", href: "/content/analytics", key: "content-analytics", area: "tenant", resource: "analytics" }
+      { label: "Integrations", href: "/content/integrations", key: "content-integrations", area: "tenant", resource: "postback_configs" }
     ]
   },
   {
+    id: "insights",
+    section: "Insights",
+    icon: "insights",
+    items: [
+      { label: "Analytics", href: "/content/analytics", key: "content-analytics", area: "tenant", resource: "analytics" },
+      { label: "Reports", href: "/content/reports", key: "content-reports", area: "tenant", resource: "reports" },
+      { label: "Alerts", href: "/content/alerts", key: "content-alerts", area: "tenant", resource: "analytics_alerts" }
+    ]
+  },
+  {
+    id: "engagement",
+    section: "Engagement",
+    icon: "engagement",
+    items: [
+      { label: "Support", href: "/content/support", key: "content-support", area: "tenant", resource: "inquiries" },
+      { label: "Newsletter", href: "/content/newsletter", key: "content-newsletter", area: "tenant", resource: "newsletter" }
+    ]
+  },
+  {
+    id: "system",
     section: "System",
+    icon: "system",
     items: [
       { label: "Users", href: "/system/users", key: "system-users", area: "tenant", resource: "users" },
       { label: "Permissions", href: "/system/permissions", key: "system-permissions", area: "tenant", resource: "users" },
@@ -85,7 +135,9 @@ const NAV = [
     ]
   },
   {
+    id: "site",
     section: "Lummet Site",
+    icon: "globe",
     items: [
       { label: "Pages", href: "/cms/pages", key: "cms-pages", area: "cms", resource: "pages" },
       { label: "Authors", href: "/cms/authors", key: "cms-authors", area: "cms", resource: "authors" },
@@ -93,20 +145,36 @@ const NAV = [
       { label: "Partners", href: "/cms/partners", key: "cms-partners", area: "cms", resource: "partners" },
       { label: "Updates", href: "/cms/updates", key: "cms-updates", area: "cms", resource: "updates" },
       { label: "Publications", href: "/cms/publications", key: "cms-publications", area: "cms", resource: "publications" },
-      { label: "Advertisements", href: "/cms/advertisements", key: "cms-advertisements", area: "cms", resource: "advertisements" },
+      { label: "Advertisements", href: "/cms/advertisements", key: "cms-advertisements", area: "cms", resource: "advertisements" }
+    ]
+  },
+  {
+    id: "site-layout",
+    section: "Site Layout",
+    icon: "layout",
+    items: [
       { label: "Homepage sections", href: "/cms/homepage_sections", key: "cms-homepage-sections", area: "cms", resource: "homepage_sections" },
       { label: "Features", href: "/cms/features", key: "cms-features", area: "cms", resource: "features" },
       { label: "FAQs", href: "/cms/faqs", key: "cms-faqs", area: "cms", resource: "faqs" },
       { label: "Navigation links", href: "/cms/nav_links", key: "cms-nav-links", area: "cms", resource: "nav_links" },
-      { label: "Inquiries", href: "/cms/inquiries", key: "cms-inquiries", area: "cms", resource: "inquiries" },
-      { label: "Forms", href: "/cms/forms", key: "cms-forms", area: "cms", resource: "forms" },
-      { label: "Form fields", href: "/cms/form_fields", key: "cms-form-fields", area: "cms", resource: "form_fields" },
       { label: "Interface text", href: "/cms/ui_strings", key: "cms-ui-strings", area: "cms", resource: "ui_strings" },
       { label: "Homepage settings", href: "/cms/settings", key: "cms-site-settings", area: "cms", resource: "site_settings" }
     ]
   },
   {
+    id: "site-forms",
+    section: "Site Forms",
+    icon: "forms",
+    items: [
+      { label: "Forms", href: "/cms/forms", key: "cms-forms", area: "cms", resource: "forms" },
+      { label: "Form fields", href: "/cms/form_fields", key: "cms-form-fields", area: "cms", resource: "form_fields" },
+      { label: "Inquiries", href: "/cms/inquiries", key: "cms-inquiries", area: "cms", resource: "inquiries" }
+    ]
+  },
+  {
+    id: "platform",
     section: "Platform",
+    icon: "platform",
     superAdminOnly: true,
     items: [
       { label: "Admins", href: "/platform/admins", key: "platform-admins" },
@@ -118,174 +186,6 @@ const NAV = [
   }
 ];
 
-const STYLES = `
-  :root {
-    --bg: #0f1117;
-    --panel: #171a23;
-    --panel-border: #262a38;
-    --text: #e7e9f0;
-    --text-dim: #9096ac;
-    --accent: #7c6cf6;
-    --accent-soft: rgba(124, 108, 246, 0.14);
-    --ok: #3ecf8e;
-    --warn: #f5a623;
-    --danger: #f0526b;
-    --radius: 10px;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    display: flex;
-    min-height: 100vh;
-  }
-  a { color: var(--accent); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-
-  .sidebar {
-    width: 240px;
-    flex-shrink: 0;
-    background: var(--panel);
-    border-right: 1px solid var(--panel-border);
-    padding: 20px 0;
-    display: flex;
-    flex-direction: column;
-  }
-  .brand {
-    padding: 0 20px 20px;
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-  }
-  .brand .dot { color: var(--accent); }
-  .nav-section { margin-top: 18px; }
-  .nav-section h4 {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-dim);
-    padding: 0 20px;
-    margin: 0 0 6px;
-  }
-  .nav-section a {
-    display: block;
-    padding: 7px 20px;
-    color: var(--text-dim);
-    font-size: 14px;
-  }
-  .nav-section a:hover { color: var(--text); text-decoration: none; background: var(--accent-soft); }
-  .nav-section a.active {
-    color: var(--text);
-    background: var(--accent-soft);
-    border-right: 2px solid var(--accent);
-  }
-
-  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  .topbar {
-    height: 56px;
-    border-bottom: 1px solid var(--panel-border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 24px;
-    flex-shrink: 0;
-  }
-  .topbar .who { font-size: 13px; color: var(--text-dim); }
-  .role-badge { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; font-size: 11px; background: var(--accent-soft); color: var(--accent); text-transform: uppercase; letter-spacing: 0.03em; }
-  .topbar .logout { font-size: 13px; }
-  .content { padding: 28px; overflow-y: auto; }
-
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .subtitle { color: var(--text-dim); font-size: 14px; margin: 0 0 24px; }
-
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    border-radius: var(--radius);
-    padding: 20px;
-    margin-bottom: 20px;
-  }
-  .card h2 { font-size: 15px; margin: 0 0 14px; }
-
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
-  .stat { background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 16px; }
-  .stat .num { font-size: 28px; font-weight: 700; }
-  .stat .label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
-
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th { text-align: left; color: var(--text-dim); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 10px; border-bottom: 1px solid var(--panel-border); }
-  td { padding: 10px; border-bottom: 1px solid var(--panel-border); vertical-align: middle; }
-  tr:last-child td { border-bottom: none; }
-
-  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-  .badge-ok { background: rgba(62, 207, 142, 0.14); color: var(--ok); }
-  .badge-warn { background: rgba(245, 166, 35, 0.14); color: var(--warn); }
-  .badge-danger { background: rgba(240, 82, 107, 0.14); color: var(--danger); }
-  .badge-dim { background: rgba(144, 150, 172, 0.14); color: var(--text-dim); }
-  .badge-toggle-btn { border: none; cursor: pointer; font-family: inherit; transition: filter 0.15s ease; }
-  .badge-toggle-btn:hover { filter: brightness(0.9); }
-  .badge-toggle-btn:disabled { opacity: 0.6; cursor: default; }
-
-  .btn {
-    display: inline-block;
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 7px;
-    padding: 9px 16px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .btn:hover { opacity: 0.9; text-decoration: none; }
-  .btn-secondary { background: transparent; border: 1px solid var(--panel-border); color: var(--text); }
-  .btn-danger { background: var(--danger); }
-  .btn-small { padding: 5px 10px; font-size: 12px; }
-
-  input, textarea, select {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 7px;
-    padding: 9px 12px;
-    color: var(--text);
-    font-size: 14px;
-    margin-bottom: 14px;
-  }
-  label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 6px; }
-
-  .empty { color: var(--text-dim); font-size: 14px; padding: 24px 0; text-align: center; }
-  .flash { padding: 12px 16px; border-radius: var(--radius); margin-bottom: 20px; font-size: 14px; }
-  .flash-error { background: rgba(240, 82, 107, 0.1); border: 1px solid rgba(240, 82, 107, 0.3); color: #ff8fa3; }
-  .flash-success { background: rgba(62, 207, 142, 0.1); border: 1px solid rgba(62, 207, 142, 0.3); color: var(--ok); }
-  .mono { font-family: "SF Mono", Consolas, monospace; font-size: 13px; }
-  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-  .rte-toolbar { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
-  .rte-toolbar button {
-    background: var(--bg); border: 1px solid var(--panel-border); color: var(--text);
-    border-radius: 5px; padding: 5px 9px; font-size: 12px; cursor: pointer;
-  }
-  .rte-toolbar button:hover { background: var(--accent-soft); }
-  .rte-editor {
-    min-height: 180px; max-height: 480px; overflow-y: auto;
-    background: var(--bg); border: 1px solid var(--panel-border); border-radius: 7px;
-    padding: 12px 14px; margin-bottom: 14px; font-size: 14px; line-height: 1.6;
-  }
-  .rte-editor:focus { outline: none; border-color: var(--accent); }
-  .rte-editor h2, .rte-editor h3 { margin: 0.6em 0 0.3em; }
-  .rte-editor blockquote { border-left: 3px solid var(--accent); margin: 0.6em 0; padding-left: 12px; color: var(--text-dim); }
-  .rte-editor ul, .rte-editor ol { padding-left: 22px; }
-
-  .media-field .media-preview { margin-bottom: 8px; }
-  .media-picker-panel { background: var(--bg); }
-`;
-
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -294,31 +194,46 @@ function escapeHtml(value) {
 
 /**
  * Filters NAV down to what this admin may actually use, then
- * renders it. `permMap` is the output of rbac.js's
- * loadPermissionMap() — `null` means "super admin, allow
- * everything" (see rbac.js), matching the tenant's own `admin`
- * role bypassing its permissions table.
+ * renders it as collapsible groups. `permMap` is the output of
+ * rbac.js's loadPermissionMap() — `null` means "super admin,
+ * allow everything" (see rbac.js), matching the tenant's own
+ * `admin` role bypassing its permissions table. The group that
+ * holds the current page is open and marked; the first group is
+ * open by default so a new visitor sees where to start.
  */
 function renderNav(activeKey, permMap, isSuper) {
+  let firstRendered = true;
   return NAV.map((section) => {
     if (section.superAdminOnly && !isSuper) return null;
 
     const visibleItems = section.items.filter((item) => {
-      if (!item.area) return true; // e.g. Dashboard/Overview — always visible
+      if (!item.area) return true; // e.g. Overview — always visible
       if (permMap === null) return true; // super admin sentinel
       return !!permMap?.[item.area]?.[item.resource]?.read;
     });
     if (visibleItems.length === 0) return null;
 
+    const hasActive = visibleItems.some((item) => item.key === activeKey);
+    const open = hasActive || firstRendered;
+    firstRendered = false;
+
     return `
-      <div class="nav-section">
-        <h4>${escapeHtml(section.section)}</h4>
-        ${visibleItems
-          .map(
-            (item) => `<a href="${item.href}" class="${item.key === activeKey ? "active" : ""}">${escapeHtml(item.label)}</a>`
-          )
-          .join("")}
-      </div>`;
+      <details class="nav-group" data-group="${escapeHtml(section.id)}"${hasActive ? " data-has-active" : ""}${open ? " open" : ""}>
+        <summary>
+          <span class="icon group-icon">${ICONS[section.icon] || ""}</span>
+          <span class="group-label">${escapeHtml(section.section)}</span>
+          <span class="group-count">${visibleItems.length}</span>
+          <span class="icon chevron">${ICONS.chevron}</span>
+        </summary>
+        <div class="nav-links">
+          ${visibleItems
+            .map(
+              (item) =>
+                `<a href="${item.href}" class="${item.key === activeKey ? "active" : ""}"${item.key === activeKey ? ' aria-current="page"' : ""}>${escapeHtml(item.label)}</a>`
+            )
+            .join("")}
+        </div>
+      </details>`;
   }).filter(Boolean).join("");
 }
 
@@ -348,11 +263,28 @@ function renderTenantSwitcher(tenants, activeTenantId) {
     </div>`;
 }
 
+function renderUserMenu(admin, isSuper) {
+  const initial = escapeHtml((admin.email || "?").trim().charAt(0));
+  return `
+    <details class="user-menu" id="user-menu">
+      <summary aria-label="Account menu">
+        <span class="avatar">${initial}</span>
+        <span class="who-name">${escapeHtml(admin.email)}</span>
+      </summary>
+      <div class="menu-pop">
+        <div class="who-full">${escapeHtml(admin.email)}<br><span class="role-badge">${escapeHtml(isSuper ? "super admin" : "staff")}</span></div>
+        <a href="/account/password">Change password</a>
+        <button type="button" id="logout-btn">Log out</button>
+      </div>
+    </details>`;
+}
+
 /**
- * Full page shell: sidebar + topbar (with tenant switcher) +
- * content. Use for every authenticated dashboard page. Pass `env`
- * so the switcher can list registered tenants; omit it only for
- * pages rendered without D1 access (there currently are none).
+ * Full page shell: grouped sidebar + topbar (menu toggle, tenant
+ * switcher, theme, account) + content. Use for every
+ * authenticated dashboard page. Pass `env` so the switcher can
+ * list registered tenants; omit it only for pages rendered
+ * without D1 access (there currently are none).
  */
 export async function renderShell({ title, activeKey, admin, bodyHtml, env }) {
   const allTenants = env ? await getSwitcherTenants(env) : [];
@@ -361,35 +293,45 @@ export async function renderShell({ title, activeKey, admin, bodyHtml, env }) {
   const tenants = env && admin ? await listAccessibleTenants(env, admin, allTenants) : allTenants;
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
   <title>${escapeHtml(title)} · Lummet</title>
-  <style>
-    ${STYLES}
-    .switcher { display: flex; align-items: center; gap: 8px; }
-    .switcher label { margin: 0; white-space: nowrap; }
-    .switcher select { width: auto; min-width: 180px; margin: 0; }
-    .topbar-right { display: flex; align-items: center; gap: 18px; }
-  </style>
+  <script>${BOOT_SCRIPT}</script>
+  <style>${STYLES}</style>
 </head>
 <body>
-  <nav class="sidebar">
-    <div class="brand"><span class="dot">●</span> Lummet</div>
-    ${renderNav(activeKey, permMap, isSuper)}
-  </nav>
-  <div class="main">
-    <div class="topbar">
-      ${admin ? renderTenantSwitcher(tenants, admin.activeTenantId) : "<div></div>"}
-      <div class="topbar-right">
-        <div class="who">${admin ? escapeHtml(admin.email) : ""}${admin ? ` <span class="role-badge">${escapeHtml(isSuper ? "super admin" : "staff")}</span>` : ""}</div>
-        ${admin ? `<a class="logout" href="/account/password">Change password</a>` : ""}
-        ${admin ? `<a class="logout" href="#" onclick="fetch('/api/auth/logout',{method:'POST'}).then(()=>location.href='/login');return false;">Log out</a>` : ""}
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <div class="app">
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+      <div class="sidebar-head">
+        <a class="brand" href="/"><span class="dot"></span> Lummet</a>
+        <button type="button" class="icon-btn nav-close" id="nav-close" aria-label="Close menu">${ICONS.close}</button>
       </div>
-    </div>
-    <div class="content">
-      ${bodyHtml}
+      <div class="nav-filter-wrap">
+        <input type="search" id="nav-filter" placeholder="Find a page…" aria-label="Find a page" autocomplete="off" />
+      </div>
+      <nav class="nav-scroll" aria-label="Sections">
+        ${renderNav(activeKey, permMap, isSuper)}
+        <div class="nav-empty" id="nav-empty" hidden>No matching pages.</div>
+      </nav>
+    </aside>
+    <div class="nav-backdrop" id="nav-backdrop"></div>
+    <div class="main">
+      <header class="topbar">
+        <button type="button" class="icon-btn" id="nav-toggle" aria-controls="sidebar" aria-expanded="true" aria-label="Toggle menu">${ICONS.menu}</button>
+        <div class="page-crumb">Lummet <span aria-hidden="true">/</span> <strong>${escapeHtml(title)}</strong></div>
+        <div class="topbar-right">
+          <button type="button" class="icon-btn theme-toggle" id="theme-toggle" aria-label="Switch color theme"><span class="icon sun">${ICONS.sun}</span><span class="icon moon">${ICONS.moon}</span></button>
+          ${admin ? renderUserMenu(admin, isSuper) : ""}
+        </div>
+        ${admin ? renderTenantSwitcher(tenants, admin.activeTenantId) : ""}
+      </header>
+      <main class="content" id="main-content">
+        ${bodyHtml}
+      </main>
     </div>
   </div>
   <script>
@@ -405,6 +347,7 @@ export async function renderShell({ title, activeKey, admin, bodyHtml, env }) {
         .catch(() => alert('Could not switch tenant.'));
     }
   </script>
+  <script>${CLIENT_SCRIPT}</script>
 </body>
 </html>`;
 }
@@ -415,30 +358,33 @@ export async function renderShell({ title, activeKey, admin, bodyHtml, env }) {
  */
 export function renderAuthShell({ title, bodyHtml }) {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
   <title>${escapeHtml(title)} · Lummet</title>
+  <script>${BOOT_SCRIPT}</script>
   <style>
     ${STYLES}
-    body { align-items: center; justify-content: center; }
-    .auth-card { width: 380px; }
-    .brand-lg { font-size: 26px; font-weight: 700; margin-bottom: 4px; text-align: center; }
-    .brand-lg .dot { color: var(--accent); }
+    body { display: flex; align-items: center; justify-content: center; padding: 20px 16px; background: radial-gradient(900px 500px at 50% -10%, var(--accent-soft), transparent 70%), var(--bg); }
+    .auth-card { width: 100%; max-width: 400px; }
+    .brand-lg { font-size: 26px; font-weight: 700; margin-bottom: 4px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .brand-lg .dot { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--accent), #4cc3ff); display: inline-block; }
     .auth-subtitle { text-align: center; color: var(--text-dim); font-size: 14px; margin-bottom: 24px; }
   </style>
 </head>
 <body>
-  <div class="auth-card">
-    <div class="brand-lg"><span class="dot">●</span> Lummet</div>
+  <main class="auth-card">
+    <div class="brand-lg"><span class="dot"></span> Lummet</div>
     <div class="auth-subtitle">Central control plane</div>
     <div class="card">
       ${bodyHtml}
     </div>
-  </div>
+  </main>
+  <script>${CLIENT_SCRIPT}</script>
 </body>
 </html>`;
 }
 
-export { escapeHtml };
+export { escapeHtml, NAV };

@@ -432,6 +432,15 @@ The public site (`/`, `/brands`, `/updates`, `/insights`, `/partners`,
 - **Migration:** `0008_contact_demo_forms.sql` (safe to re-run).
 - **Optional secret:** `INQUIRY_WEBHOOK_URL` for a new-inquiry notification.
 
+### Phase 12 — Redesigned dashboard shell
+
+- The staff dashboard has a new shell: a grouped, collapsible sidebar behind a
+  menu button (docked on desktop, a slide-out drawer on phones), a top bar with
+  the tenant switcher, theme toggle and account menu, and a light and a dark theme.
+- Navigation is regrouped into 13 sections. Every link, URL and permission rule
+  is unchanged; only the grouping and look are new. See `docs/DASHBOARD_UI.md`.
+- No migration and no new secret.
+
 ## Deployment
 
 See **DEPLOYMENT.md** in this same folder for the full, step-by-step

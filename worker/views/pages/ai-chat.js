@@ -65,7 +65,7 @@ export async function renderAiChatPage(env, admin) {
       .ai-bubble { max-width: 80%; padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
       .ai-bubble-user { align-self: flex-end; background: var(--accent); color: #fff; }
       .ai-bubble-assistant { align-self: flex-start; background: var(--bg); border: 1px solid var(--panel-border); }
-      .ai-bubble-error { align-self: flex-start; background: rgba(240, 82, 107, 0.1); border: 1px solid rgba(240, 82, 107, 0.3); color: #ff8fa3; }
+      .ai-bubble-error { align-self: flex-start; background: rgba(240, 82, 107, 0.1); border: 1px solid rgba(240, 82, 107, 0.3); color: var(--danger-text); }
       .ai-composer { display: flex; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--panel-border); }
       .ai-composer input { margin: 0; }
       .ai-composer button { flex-shrink: 0; }
@@ -77,7 +77,7 @@ export async function renderAiChatPage(env, admin) {
       .ai-diff-table { width: 100%; margin-bottom: 10px; }
       .ai-diff-table td { padding: 6px 8px; font-size: 13px; border-bottom: 1px solid var(--panel-border); }
       .ai-diff-field { color: var(--text-dim); white-space: nowrap; }
-      .ai-diff-current { color: #ff8fa3; text-decoration: line-through; }
+      .ai-diff-current { color: var(--danger-text); text-decoration: line-through; }
       .ai-diff-proposed { color: var(--ok); }
       .ai-preview-actions { display: flex; gap: 8px; margin-top: 10px; }
       .ai-preview-resolved { color: var(--text-dim); font-style: italic; }
@@ -223,10 +223,10 @@ export async function renderAiChatPage(env, admin) {
           } else {
             let failText = data.message || data.error || "The write failed.";
             if (data.error && data.error !== data.message) failText += " (reason: " + data.error + ")";
-            actions.outerHTML = '<div class="ai-preview-resolved" style="color:#ff8fa3;">' + aiEscapeHtml(failText) + '</div>';
+            actions.outerHTML = '<div class="ai-preview-resolved" style="color:var(--danger-text);">' + aiEscapeHtml(failText) + '</div>';
           }
         } catch (e) {
-          actions.outerHTML = '<div class="ai-preview-resolved" style="color:#ff8fa3;">Could not reach the server.</div>';
+          actions.outerHTML = '<div class="ai-preview-resolved" style="color:var(--danger-text);">Could not reach the server.</div>';
         }
         aiScrollToBottom();
       }
